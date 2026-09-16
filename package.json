@@ -1,0 +1,18 @@
+{
+  "name": "traktor-stem-packager",
+  "version": "0.4.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-contained macOS Traktor Stem packaging engine prototype",
+  "scripts": {
+    "pack": "node src/pack.mjs",
+    "inspect": "node src/inspect.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "stem-mp4": "file:vendor/stem-mp4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

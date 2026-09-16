@@ -1,0 +1,57 @@
+name: Build macOS Beta
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Run engine tests
+        run: |
+          npm ci
+          npm test
+
+      - name: Prepare private arm64 runtime
+        run: macos/scripts/prepare-runtime.sh
+
+      - name: Build self-contained app
+        run: macos/scripts/build-app.sh
+
+      - name: Verify bundle
+        run: |
+          APP="macos/build/Traktor Stem Packager.app"
+          test -x "$APP/Contents/MacOS/TraktorStemPackager"
+          test -x "$APP/Contents/Resources/Runtime/node"
+          test -x "$APP/Contents/Resources/Runtime/ffmpeg"
+          test -x "$APP/Contents/Resources/Runtime/ffprobe"
+          codesign --verify --deep --strict "$APP"
+          file "$APP/Contents/MacOS/TraktorStemPackager" | grep arm64
+          file "$APP/Contents/Resources/Runtime/node" | grep arm64
+          file "$APP/Contents/Resources/Runtime/ffmpeg" | grep arm64
+
+      - name: Package application
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            "macos/build/Traktor Stem Packager.app" \
+            "Traktor-Stem-Packager-0.4-macOS-arm64.zip"
+          shasum -a 256 "Traktor-Stem-Packager-0.4-macOS-arm64.zip" \
+            > "Traktor-Stem-Packager-0.4-macOS-arm64.zip.sha256"
+
+      - name: Upload beta artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Traktor-Stem-Packager-0.4-macOS-arm64
+          path: |
+            Traktor-Stem-Packager-0.4-macOS-arm64.zip
+            Traktor-Stem-Packager-0.4-macOS-arm64.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
