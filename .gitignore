@@ -1,0 +1,7 @@
+node_modules/
+macos/.build/
+macos/build/
+Runtime/
+.DS_Store
+*.zip
+*.sha256
