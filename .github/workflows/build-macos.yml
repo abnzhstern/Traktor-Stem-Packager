@@ -39,6 +39,9 @@ jobs:
           test -x "$APP/Contents/Resources/Runtime/node"
           test -x "$APP/Contents/Resources/Runtime/ffmpeg"
           test -x "$APP/Contents/Resources/Runtime/ffprobe"
+          test -f "$APP/Contents/Resources/AppIcon.icns"
+          test "$(plutil -extract CFBundleDisplayName raw "$APP/Contents/Info.plist")" = "Traktor Stem Packager"
+          test "$(plutil -extract CFBundleIconFile raw "$APP/Contents/Info.plist")" = "AppIcon"
           codesign --verify --deep --strict "$APP"
           file "$APP/Contents/MacOS/TraktorStemPackager" | grep arm64
           file "$APP/Contents/Resources/Runtime/node" | grep arm64
