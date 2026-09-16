@@ -7,8 +7,7 @@ PROJECT_DIR=${MACOS_DIR:h}
 RUNTIME_DIR="$MACOS_DIR/Runtime/macos-arm64"
 BUILD_DIR="$MACOS_DIR/build"
 APP_DIR="$BUILD_DIR/Traktor Stem Packager.app"
-ICON_SOURCE_B64="$MACOS_DIR/Resources/AppIcon-1024.jpg.base64"
-ICON_SOURCE="$BUILD_DIR/AppIcon-1024.jpg"
+ICON_SOURCE="$MACOS_DIR/Resources/AppIcon-1024.png"
 ICONSET_DIR="$BUILD_DIR/AppIcon.iconset"
 
 chmod +x "$SCRIPT_DIR/prepare-runtime.sh"
@@ -33,12 +32,11 @@ cp "$RUNTIME_DIR/node" "$RUNTIME_DIR/ffmpeg" "$RUNTIME_DIR/ffprobe" "$APP_DIR/Co
 cp -R "$PROJECT_DIR/src" "$PROJECT_DIR/vendor" "$PROJECT_DIR/node_modules" "$PROJECT_DIR/package.json" "$APP_DIR/Contents/Resources/Engine/"
 cp "$PROJECT_DIR/THIRD_PARTY_NOTICES.md" "$APP_DIR/Contents/Resources/"
 
-if [[ ! -f "$ICON_SOURCE_B64" ]]; then
-  echo "Missing app icon source: $ICON_SOURCE_B64" >&2
+if [[ ! -f "$ICON_SOURCE" ]]; then
+  echo "Missing app icon source: $ICON_SOURCE" >&2
   exit 1
 fi
 
-base64 -D -i "$ICON_SOURCE_B64" -o "$ICON_SOURCE"
 rm -rf "$ICONSET_DIR"
 mkdir -p "$ICONSET_DIR"
 sips -z 16 16 -s format png "$ICON_SOURCE" --out "$ICONSET_DIR/icon_16x16.png" >/dev/null
