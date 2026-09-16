@@ -269,7 +269,7 @@ export function addMusicalKeyBuffer(uint8, musicalKey) {
 }
 
 // ============================================================================
-// Standard metadata (title/artist/album/year/genre/tempo) — iTunes atoms
+// Standard metadata — iTunes atoms
 // ============================================================================
 
 /**
@@ -294,6 +294,11 @@ function buildStandardMetadataAtoms(metadata) {
     return createAtom('tmpo', dataAtom);
   };
 
+  const createFreeformTextAtom = (name, value) => {
+    if (!value) return null;
+    return createFreeformAtom('com.apple.iTunes', name, 1, utf8Encode(String(value)));
+  };
+
   if (metadata.title) {
     const atom = createTextAtom('©nam', metadata.title);
     if (atom) atomsToWrite.push({ name: 'title', atom });
@@ -306,9 +311,12 @@ function buildStandardMetadataAtoms(metadata) {
     const atom = createTextAtom('©alb', metadata.album);
     if (atom) atomsToWrite.push({ name: 'album', atom });
   }
-  if (metadata.year) {
-    const atom = createTextAtom('©day', String(metadata.year));
-    if (atom) atomsToWrite.push({ name: 'year', atom });
+  const releaseDate = metadata.releaseDate || metadata.date || metadata.year;
+  if (releaseDate) {
+    const atom = createTextAtom('©day', String(releaseDate));
+    if (atom) atomsToWrite.push({ name: 'releaseDate', atom });
+    const freeform = createFreeformTextAtom('RELEASEDATE', releaseDate);
+    if (freeform) atomsToWrite.push({ name: 'releaseDateFreeform', atom: freeform });
   }
   if (metadata.genre) {
     const atom = createTextAtom('©gen', metadata.genre);
@@ -318,6 +326,14 @@ function buildStandardMetadataAtoms(metadata) {
     const atom = createBpmAtom(metadata.tempo);
     if (atom) atomsToWrite.push({ name: 'BPM', atom });
   }
+  if (metadata.producer) {
+    const atom = createFreeformTextAtom('PRODUCER', metadata.producer);
+    if (atom) atomsToWrite.push({ name: 'producer', atom });
+  }
+  if (metadata.label) {
+    const atom = createFreeformTextAtom('LABEL', metadata.label);
+    if (atom) atomsToWrite.push({ name: 'label', atom });
+  }
 
   return atomsToWrite;
 }
@@ -325,7 +341,7 @@ function buildStandardMetadataAtoms(metadata) {
 /**
  * Isomorphic core: add standard metadata atoms to an in-memory MP4.
  * @param {Uint8Array} uint8 - whole MP4 file
- * @param {Object} metadata - { title, artist, album, year, genre, tempo }
+ * @param {Object} metadata - { title, artist, album, releaseDate, producer, label, genre, tempo }
  * @returns {Uint8Array} new MP4 bytes
  */
 export function addStandardMetadataBuffer(uint8, metadata) {

@@ -43,7 +43,7 @@ class StemMp4Writer {
    *   single-track AAC .m4a (Uint8Array/ArrayBuffer/Buffer). For STEMS-2: { music, vocals }.
    * @param {Uint8Array} opts.mixdownAac - the encoded mixdown/original-mix AAC .m4a.
    * @param {Object} [opts.lyricsData] - { lines:[{text,start,end,words?}], singers? }.
-   * @param {Object} [opts.metadata] - { title, artist, album, year, genre, tempo, track, key }.
+   * @param {Object} [opts.metadata] - { title, artist, album, releaseDate, producer, label, genre, tempo, track, key }.
    * @param {Object} [opts.analysisFeatures] - { key_detection, vocal_pitch, onsets, tempo_map }.
    * @param {string} [opts.profile] - 'STEMS-4' (default) | 'STEMS-2'.
    * @param {number} [opts.encoderDelaySamples] - AAC priming delay the caller's encoder
@@ -108,13 +108,15 @@ class StemMp4Writer {
       : defaultStemNames;
     file = await Atoms.addNiStemsMetadataBuffer(file, stemNames, masteringDsp);
 
-    // 4) Standard metadata (title/artist/album/year/genre/tempo).
+    // 4) Standard metadata.
     const md = metadata.song || metadata;
     file = await Atoms.addStandardMetadataBuffer(file, {
       title: md.title,
       artist: md.artist,
       album: md.album,
-      year: md.year,
+      releaseDate: md.releaseDate || md.year,
+      producer: md.producer,
+      label: md.label,
       genre: md.genre,
       tempo: md.tempo || md.bpm || analysisFeatures?.tempo_map?.bpm,
     });

@@ -26,14 +26,29 @@ struct EngineBridge {
     private var ffmpeg: URL { resources.appending(path: "Runtime/ffmpeg") }
     private var ffprobe: URL { resources.appending(path: "Runtime/ffprobe") }
     private var engine: URL { resources.appending(path: "Engine/src/pack.mjs") }
+    private var metadataEngine: URL { resources.appending(path: "Engine/src/read-metadata.mjs") }
 
     private func requireComponents() throws {
         let manager = FileManager.default
-        for (url, name) in [(node, "Node runtime"), (ffmpeg, "encoder"), (ffprobe, "media inspector"), (engine, "packaging engine")] {
-            guard manager.isExecutableFile(atPath: url.path) || (name == "packaging engine" && manager.fileExists(atPath: url.path)) else {
+        for (url, name) in [(node, "Node runtime"), (ffmpeg, "encoder"), (ffprobe, "media inspector"), (engine, "packaging engine"), (metadataEngine, "metadata reader")] {
+            let isScript = name == "packaging engine" || name == "metadata reader"
+            guard manager.isExecutableFile(atPath: url.path) || (isScript && manager.fileExists(atPath: url.path)) else {
                 throw EngineError.missingComponent(name)
             }
         }
+    }
+
+    func readMasterMetadata(master: URL) async throws -> MasterMetadata {
+        try requireComponents()
+        let result = try await execute(
+            arguments: [metadataEngine.path, "--master", master.path],
+            progress: nil
+        )
+        guard let marker = result.split(separator: "\n").first(where: { $0.hasPrefix("MASTER_METADATA ") }) else {
+            throw EngineError.invalidResponse
+        }
+        let json = marker.dropFirst("MASTER_METADATA ".count)
+        return try JSONDecoder().decode(MasterMetadata.self, from: Data(json.utf8))
     }
 
     func validate(files: [AudioRole: URL]) async throws -> ValidationReport {
@@ -52,14 +67,19 @@ struct EngineBridge {
         artist: String,
         album: String,
         genre: String,
-        year: String,
+        releaseDate: String,
+        producer: String,
+        label: String,
         artwork: URL?,
         stemNames: [AudioRole: String],
         progress: @escaping @Sendable (String) -> Void
     ) async throws {
         _ = try await run(
             files: files, output: output, validateOnly: false,
-            metadata: ["title": title, "artist": artist, "album": album, "genre": genre, "year": year],
+            metadata: [
+                "title": title, "artist": artist, "album": album, "genre": genre,
+                "release-date": releaseDate, "producer": producer, "label": label
+            ],
             stemNames: stemNames, artwork: artwork, progress: progress
         )
     }
@@ -84,7 +104,7 @@ struct EngineBridge {
         } else if let output {
             arguments += ["--output", output.path]
         }
-        for key in ["title", "artist", "album", "genre", "year"] {
+        for key in ["title", "artist", "album", "genre", "release-date", "producer", "label"] {
             if let value = metadata[key], !value.isEmpty { arguments += ["--\(key)", value] }
         }
         for role in [AudioRole.drums, .bass, .other, .vocals] {
@@ -94,7 +114,14 @@ struct EngineBridge {
         }
         if let artwork { arguments += ["--artwork", artwork.path] }
 
-        return try await withCheckedThrowingContinuation { continuation in
+        return try await execute(arguments: arguments, progress: progress)
+    }
+
+    private func execute(
+        arguments: [String],
+        progress: (@Sendable (String) -> Void)?
+    ) async throws -> String {
+        try await withCheckedThrowingContinuation { continuation in
             let process = Process()
             let pipe = Pipe()
             process.executableURL = node
@@ -132,4 +159,16 @@ struct EngineBridge {
             catch { continuation.resume(throwing: error) }
         }
     }
+}
+
+struct MasterMetadata: Decodable {
+    let title: String
+    let artist: String
+    let album: String
+    let releaseDate: String
+    let producer: String
+    let label: String
+    let genre: String
+    let artworkBase64: String?
+    let artworkMimeType: String?
 }

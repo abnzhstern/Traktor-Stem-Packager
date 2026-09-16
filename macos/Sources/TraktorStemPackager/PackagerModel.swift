@@ -17,7 +17,9 @@ final class PackagerModel: ObservableObject {
     @Published var artist = ""
     @Published var album = ""
     @Published var genre = ""
-    @Published var year = ""
+    @Published var releaseDate = ""
+    @Published var producer = ""
+    @Published var label = ""
     @Published var artworkURL: URL?
     @Published var stemNames: [AudioRole: String] = [
         .drums: "Drums", .bass: "Bass", .other: "Other", .vocals: "Vocals"
@@ -25,6 +27,7 @@ final class PackagerModel: ObservableObject {
     @Published var state: State = .waiting
     @Published var report: ValidationReport?
     @Published var statusText = "Add the master and four matching stereo stems."
+    private var extractedArtworkURL: URL?
 
     var hasAllFiles: Bool { AudioRole.allCases.allSatisfy { files[$0] != nil } }
     var canCreate: Bool { state == .ready && hasAllFiles }
@@ -34,8 +37,9 @@ final class PackagerModel: ObservableObject {
         report = nil
         state = .waiting
         statusText = hasAllFiles ? "Checking compatibility…" : "Add the remaining audio files."
-        if role == .master && title.isEmpty {
+        if role == .master {
             title = url.deletingPathExtension().lastPathComponent
+            Task { await loadMasterMetadata(from: url) }
         }
         if hasAllFiles { Task { await validate() } }
     }
@@ -45,6 +49,55 @@ final class PackagerModel: ObservableObject {
         report = nil
         state = .waiting
         statusText = "Add the remaining audio files."
+        if role == .master {
+            title = ""
+            artist = ""
+            album = ""
+            genre = ""
+            releaseDate = ""
+            producer = ""
+            label = ""
+            discardExtractedArtwork()
+        }
+    }
+
+    func setArtwork(_ url: URL?) {
+        discardExtractedArtwork()
+        artworkURL = url
+    }
+
+    private func loadMasterMetadata(from url: URL) async {
+        do {
+            let bridge = try EngineBridge()
+            let metadata = try await bridge.readMasterMetadata(master: url)
+            guard files[.master] == url else { return }
+            title = metadata.title
+            artist = metadata.artist
+            album = metadata.album
+            genre = metadata.genre
+            releaseDate = metadata.releaseDate
+            producer = metadata.producer
+            label = metadata.label
+            discardExtractedArtwork()
+            if let encoded = metadata.artworkBase64,
+               let data = Data(base64Encoded: encoded), !data.isEmpty {
+                let fileExtension = metadata.artworkMimeType == "image/png" ? "png" : "jpg"
+                let artwork = FileManager.default.temporaryDirectory
+                    .appending(path: "traktor-master-artwork-\(UUID().uuidString).\(fileExtension)")
+                try data.write(to: artwork, options: .atomic)
+                extractedArtworkURL = artwork
+                artworkURL = artwork
+            }
+        } catch {
+            // Keep filename fallback and allow packaging when the source has no readable tags.
+        }
+    }
+
+    private func discardExtractedArtwork() {
+        guard let extractedArtworkURL else { return }
+        if artworkURL == extractedArtworkURL { artworkURL = nil }
+        try? FileManager.default.removeItem(at: extractedArtworkURL)
+        self.extractedArtworkURL = nil
     }
 
     func validate() async {
@@ -84,7 +137,9 @@ final class PackagerModel: ObservableObject {
                 artist: artist,
                 album: album,
                 genre: genre,
-                year: year,
+                releaseDate: releaseDate,
+                producer: producer,
+                label: label,
                 artwork: artworkURL,
                 stemNames: stemNames
             ) { message in

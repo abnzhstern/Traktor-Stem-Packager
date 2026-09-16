@@ -22,7 +22,7 @@ struct ContentView: View {
             }
             footer
         }
-        .frame(minWidth: 760, minHeight: 610)
+        .frame(minWidth: 760, minHeight: 660)
         .background(background)
         .preferredColorScheme(.dark)
     }
@@ -71,8 +71,12 @@ struct ContentView: View {
                 metadataRow("Artist", text: $model.artist, placeholder: "Artist")
                 metadataRow("Album", text: $model.album, placeholder: "Album")
                 HStack(spacing: 12) {
-                    metadataRow("Genre", text: $model.genre, placeholder: "Genre")
-                    metadataRow("Year", text: $model.year, placeholder: "Year", labelWidth: 36)
+                    metadataRow("Producer", text: $model.producer, placeholder: "Producer", labelWidth: 56)
+                    metadataRow("Label", text: $model.label, placeholder: "Label", labelWidth: 36)
+                }
+                HStack(spacing: 12) {
+                    metadataRow("Genre", text: $model.genre, placeholder: "Genre", labelWidth: 56)
+                    metadataRow("Released", text: $model.releaseDate, placeholder: "YYYY-MM-DD", labelWidth: 52)
                 }
             }
         }
@@ -177,7 +181,7 @@ struct ContentView: View {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.jpeg, .png]
         panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK { model.artworkURL = panel.url }
+        if panel.runModal() == .OK { model.setArtwork(panel.url) }
     }
 
     private var statusIcon: String {

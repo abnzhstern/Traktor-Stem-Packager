@@ -156,11 +156,11 @@ export async function addMusicalKey(filePath, musicalKey) {
 }
 
 // ============================================================================
-// Standard metadata (title/artist/album/year/genre/tempo) — iTunes atoms
+// Standard metadata — iTunes atoms
 // ============================================================================
 
 /**
- * Add standard MP4 metadata atoms (title, artist, album, year, genre, BPM) (Node path API).
+ * Add standard MP4 metadata atoms (title, artist, album, release date, producer, label, genre, BPM) (Node path API).
  * @param {string} filePath - Path to MP4 file
  * @param {Object} metadata - Metadata object
  */

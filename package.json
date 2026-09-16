@@ -10,6 +10,7 @@
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
+    "music-metadata": "^11.15.0",
     "stem-mp4": "file:vendor/stem-mp4"
   },
   "engines": {

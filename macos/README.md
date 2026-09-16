@@ -16,7 +16,7 @@ The distributable application is self-contained. Its app bundle includes the val
 - Apple Silicon build layout
 - Traktor-inspired dark interface with exact default stem colors
 - Editable stem display names
-- Title, artist, album, genre, and year metadata
+- Automatic title, artist, album, release date, producer, label, genre, and artwork import from the stereo master
 - JPEG/PNG artwork selection and embedding
 
 ## Build requirement

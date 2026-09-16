@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 import { readFile, rm } from 'node:fs/promises';
-import { basename, join, resolve } from 'node:path';
+import { basename, extname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { mkdtemp } from 'node:fs/promises';
 import { StemMp4Writer } from 'stem-mp4';
 import { analyzeStemSum, createProtectiveDsp, encodeAac, probeAudio, validateSet } from './media.mjs';
+import { readMasterMetadata } from './metadata.mjs';
 
 function usage() {
-  console.error('Usage: node src/pack.mjs --master FILE --drums FILE --bass FILE --other FILE --vocals FILE [--output FILE] [--validate-only true] [--title TITLE] [--artist ARTIST] [--album ALBUM] [--genre GENRE] [--drums-name NAME] [--bass-name NAME] [--other-name NAME] [--vocals-name NAME]');
+  console.error('Usage: node src/pack.mjs --master FILE --drums FILE --bass FILE --other FILE --vocals FILE [--output FILE] [--validate-only true] [--title TITLE] [--artist ARTIST] [--album ALBUM] [--release-date DATE] [--producer PRODUCER] [--label LABEL] [--genre GENRE] [--drums-name NAME] [--bass-name NAME] [--other-name NAME] [--vocals-name NAME]');
 }
 
 function parseArgs(argv) {
@@ -35,6 +36,12 @@ async function main() {
   const ffmpeg = process.env.STEM_PACKAGER_FFMPEG || 'ffmpeg';
   const ffprobe = process.env.STEM_PACKAGER_FFPROBE || 'ffprobe';
   const inputs = Object.fromEntries(trackNames.map((name) => [name, resolve(args[name])]));
+  let masterMetadata = {};
+  try {
+    masterMetadata = await readMasterMetadata(inputs.master);
+  } catch (error) {
+    console.warn(`Could not read embedded master metadata: ${error.message}`);
+  }
   const probedEntries = await Promise.all(
     Object.entries(inputs).map(async ([name, file]) => [name, await probeAudio(file, ffprobe)]),
   );
@@ -83,6 +90,9 @@ async function main() {
     if (args.artwork) {
       artwork = await readFile(resolve(args.artwork));
       artworkMimeType = /\.png$/i.test(args.artwork) ? 'image/png' : 'image/jpeg';
+    } else if (masterMetadata.artworkBase64) {
+      artwork = Buffer.from(masterMetadata.artworkBase64, 'base64');
+      artworkMimeType = masterMetadata.artworkMimeType || 'image/jpeg';
     }
     console.log('Writing NI Stem metadata and MP4 container…');
     const result = await StemMp4Writer.write({
@@ -95,11 +105,13 @@ async function main() {
         vocals: encoded.vocals,
       },
       metadata: {
-        title: args.title || basename(inputs.master).replace(/\.(aif|aiff|wav)$/i, ''),
-        artist: args.artist || '',
-        album: args.album || '',
-        genre: args.genre || '',
-        year: args.year || '',
+        title: args.title || masterMetadata.title || basename(inputs.master, extname(inputs.master)),
+        artist: args.artist || masterMetadata.artist || '',
+        album: args.album || masterMetadata.album || '',
+        genre: args.genre || masterMetadata.genre || '',
+        releaseDate: args['release-date'] || args.year || masterMetadata.releaseDate || '',
+        producer: args.producer || masterMetadata.producer || '',
+        label: args.label || masterMetadata.label || '',
       },
       profile: 'STEMS-4',
       encoderDelaySamples: 1024,
