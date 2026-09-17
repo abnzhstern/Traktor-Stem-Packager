@@ -32,9 +32,10 @@ jobs:
       - name: Build self-contained app
         run: macos/scripts/build-app.sh
 
-      - name: Verify bundle
+      - name: Verify bundle and installer
         run: |
           APP="macos/build/Traktor Stem Packager.app"
+          INSTALLER="macos/installer/Install Traktor Stem Packager.command"
           test -x "$APP/Contents/MacOS/TraktorStemPackager"
           test -x "$APP/Contents/Resources/Runtime/node"
           test -x "$APP/Contents/Resources/Runtime/ffmpeg"
@@ -46,21 +47,26 @@ jobs:
           file "$APP/Contents/MacOS/TraktorStemPackager" | grep arm64
           file "$APP/Contents/Resources/Runtime/node" | grep arm64
           file "$APP/Contents/Resources/Runtime/ffmpeg" | grep arm64
+          test -x "$INSTALLER"
+          zsh -n "$INSTALLER"
 
-      - name: Package application
+      - name: Package application with installer
         run: |
-          ditto -c -k --sequesterRsrc --keepParent \
-            "macos/build/Traktor Stem Packager.app" \
-            "Traktor-Stem-Packager-0.4-macOS-arm64.zip"
-          shasum -a 256 "Traktor-Stem-Packager-0.4-macOS-arm64.zip" \
-            > "Traktor-Stem-Packager-0.4-macOS-arm64.zip.sha256"
+          DIST="Traktor Stem Packager Installer"
+          mkdir -p "$DIST"
+          ditto "macos/build/Traktor Stem Packager.app" "$DIST/Traktor Stem Packager.app"
+          cp "macos/installer/Install Traktor Stem Packager.command" "$DIST/"
+          cp "macos/installer/README.txt" "$DIST/"
+          chmod +x "$DIST/Install Traktor Stem Packager.command"
+          ditto -c -k --sequesterRsrc --keepParent             "$DIST"             "Traktor-Stem-Packager-0.4-macOS-arm64-installer.zip"
+          shasum -a 256 "Traktor-Stem-Packager-0.4-macOS-arm64-installer.zip"             > "Traktor-Stem-Packager-0.4-macOS-arm64-installer.zip.sha256"
 
       - name: Upload beta artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Traktor-Stem-Packager-0.4-macOS-arm64
+          name: Traktor-Stem-Packager-0.4-macOS-arm64-installer
           path: |
-            Traktor-Stem-Packager-0.4-macOS-arm64.zip
-            Traktor-Stem-Packager-0.4-macOS-arm64.zip.sha256
+            Traktor-Stem-Packager-0.4-macOS-arm64-installer.zip
+            Traktor-Stem-Packager-0.4-macOS-arm64-installer.zip.sha256
           if-no-files-found: error
           retention-days: 14
