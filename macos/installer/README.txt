@@ -14,6 +14,8 @@ METHOD 1 — TRY THIS FIRST
 3. If macOS asks whether you are sure, choose Open again.
 4. The installer will place the app in Applications and launch it.
 
+If an older version is already installed, you do not need to delete it first. The installer closes it, installs the new version in the same Applications location, and moves the previous copy to the Trash as a recoverable backup.
+
 METHOD 2 — IF MACOS SAYS THE COMMAND CANNOT BE OPENED
 
 1. Open Terminal from Applications > Utilities.
@@ -34,6 +36,8 @@ WHAT THE INSTALLER DOES
 • Creates and verifies a local ad-hoc signature.
 • Launches the installed app.
 • Moves an older installed copy to the Trash as a recoverable backup.
+
+Updates use the same app name and Applications location. The app does not install audio files, engines, or large support folders elsewhere on your Mac. Normal macOS preference data may remain between versions.
 
 The installer does not disable Gatekeeper or change system-wide Mac security settings.
 

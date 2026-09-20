@@ -39,6 +39,10 @@ All five inputs must be stereo and must have matching sample rates and durations
 
 The installer places the app in Applications, clears quarantine attributes from this app only, repairs executable permissions, creates a local ad-hoc signature, verifies the app, and launches it. It does not disable Gatekeeper or alter system-wide security settings.
 
+To update, run the newer installer without deleting the existing app first. It installs the update in the same Applications location and moves the previous version to the Trash as a recoverable backup.
+
+The app checks GitHub Releases at most once every 24 hours and displays a notice when a newer version is available. You can also choose **Check for Updates…** from the app menu. Automatic connection failures are silent, no audio or metadata is uploaded, and downloads always use the permanent [latest-release link](https://github.com/abnzhstern/Traktor-Stem-Packager/releases/latest).
+
 Because the build is not Apple-notarized, macOS behavior may vary by version and security software. Terminal is needed only for installation when macOS blocks the normal right-click method.
 
 ## Build from source

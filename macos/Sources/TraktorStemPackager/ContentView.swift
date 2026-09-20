@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @EnvironmentObject private var model: PackagerModel
+    @EnvironmentObject private var updateChecker: UpdateChecker
     @State private var showDetails = false
 
     private let panel = Color(red: 0.105, green: 0.11, blue: 0.125)
@@ -25,22 +26,47 @@ struct ContentView: View {
         .frame(minWidth: 760, minHeight: 660)
         .background(background)
         .preferredColorScheme(.dark)
+        .task { await updateChecker.checkAutomatically() }
+        .alert(item: $updateChecker.notice) { notice in
+            if notice.offersDownload {
+                return Alert(
+                    title: Text(notice.title),
+                    message: Text(notice.message),
+                    primaryButton: .default(Text("Download Update")) { updateChecker.openLatestRelease() },
+                    secondaryButton: .cancel(Text("Not Now"))
+                )
+            }
+            return Alert(
+                title: Text(notice.title),
+                message: Text(notice.message),
+                dismissButton: .default(Text("OK"))
+            )
+        }
     }
 
     private var titleBar: some View {
         HStack {
-            Image(systemName: "square.stack.3d.up.fill")
-                .foregroundStyle(Color.white.opacity(0.72))
-            Text("STEM PACKAGER")
-                .font(.system(size: 13, weight: .semibold))
-                .tracking(0.8)
+            Image(nsImage: NSApplication.shared.applicationIconImage)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: 54, height: 54)
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text("TRAKTOR STEM PACKAGER")
+                    .font(.system(size: 14, weight: .semibold))
+                    .tracking(0.7)
+                Text("LUCKYSTAR PRODUCTIONS")
+                    .font(.system(size: 9, weight: .semibold))
+                    .tracking(2.2)
+                    .foregroundStyle(Color.white.opacity(0.46))
+            }
             Spacer()
             Text("TRAKTOR-READY .STEM.MP4")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(Color.white.opacity(0.35))
         }
         .padding(.horizontal, 16)
-        .frame(height: 42)
+        .frame(height: 72)
         .background(Color(red: 0.17, green: 0.18, blue: 0.20))
     }
 

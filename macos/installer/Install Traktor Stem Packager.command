@@ -28,6 +28,15 @@ restore_previous() {
 [[ -w "/Applications" ]] || show_error "Your account cannot write to Applications. Copy the app there manually, then run the installer again."
 
 if [[ -e "$DEST_APP" ]]; then
+  osascript -e 'tell application "Traktor Stem Packager" to quit' >/dev/null 2>&1 || true
+  for _ in {1..20}; do
+    pgrep -x TraktorStemPackager >/dev/null 2>&1 || break
+    sleep 0.25
+  done
+  if pgrep -x TraktorStemPackager >/dev/null 2>&1; then
+    pkill -TERM -x TraktorStemPackager >/dev/null 2>&1 || true
+    sleep 1
+  fi
   BACKUP_APP="$HOME/.Trash/Traktor Stem Packager previous $STAMP.app"
   mv "$DEST_APP" "$BACKUP_APP" || show_error "Could not preserve the existing app in the Trash."
 fi
@@ -55,5 +64,10 @@ if ! codesign --verify --deep --strict "$DEST_APP"; then
 fi
 
 open "$DEST_APP"
-osascript -e 'display notification "Installed successfully in Applications." with title "Traktor Stem Packager"' >/dev/null 2>&1 || true
-print -- "Traktor Stem Packager was installed successfully."
+if [[ -n "$BACKUP_APP" ]]; then
+  osascript -e 'display notification "Updated successfully. The previous version was moved to the Trash." with title "Traktor Stem Packager"' >/dev/null 2>&1 || true
+  print -- "Traktor Stem Packager was updated successfully. The previous version is in the Trash."
+else
+  osascript -e 'display notification "Installed successfully in Applications." with title "Traktor Stem Packager"' >/dev/null 2>&1 || true
+  print -- "Traktor Stem Packager was installed successfully."
+fi
