@@ -1,0 +1,25 @@
+TRAKTOR STEM PACKAGER — LOSSLESS LINKED TEST
+
+This is an experimental test build. Do not share it publicly yet.
+
+Before testing:
+1. Import the original stereo master into Traktor Pro 4 and analyze it.
+2. Quit Traktor Pro 4 completely.
+3. Open Traktor Stem Packager and select “Lossless Linked (Test).”
+4. Choose the collection.nml used by that Traktor installation.
+5. Choose the Stems folder configured in Traktor Pro 4 Preferences.
+6. Add the original master plus the four matching 16-bit/44.1 kHz stems.
+7. Click INSTALL LINKED STEMS and accept the warning.
+8. Reopen Traktor and load the ORIGINAL master track. Do not import the hashed .stem.mp4 directly.
+
+The app creates a timestamped backup of collection.nml before changing it. If a
+linked stem file already exists for the track, that file is backed up too.
+
+For this test, confirm:
+• The linked-stems icon appears beside the original track.
+• The original track loads as a Stem Deck.
+• Each of the four stems plays cleanly without noise, crackles, or pops.
+• Playback remains clean near the end of the track.
+
+ALAC linked stems are experimental in Traktor Pro 4. NUO-STEMS also warns that
+some ALAC files can report corruption near the end, even when playback works.

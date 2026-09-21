@@ -8,7 +8,7 @@ export async function probeAudio(file, ffprobe = 'ffprobe') {
     '-v', 'error',
     '-select_streams', 'a:0',
     '-show_entries',
-    'stream=codec_name,sample_rate,channels,channel_layout,duration,duration_ts,time_base:format=duration',
+    'stream=codec_name,sample_rate,channels,channel_layout,sample_fmt,bits_per_sample,bits_per_raw_sample,duration,duration_ts,time_base:format=duration',
     '-of', 'json',
     file,
   ], { maxBuffer: 4 * 1024 * 1024 });
@@ -23,6 +23,8 @@ export async function probeAudio(file, ffprobe = 'ffprobe') {
     sampleRate: Number(stream.sample_rate),
     channels: Number(stream.channels),
     channelLayout: stream.channel_layout || '',
+    sampleFormat: stream.sample_fmt || '',
+    bitsPerSample: Number(stream.bits_per_raw_sample || stream.bits_per_sample || 0),
     duration: Number(stream.duration ?? parsed.format?.duration),
     durationTicks: stream.duration_ts == null ? null : Number(stream.duration_ts),
     timeBase: stream.time_base || '',
@@ -105,7 +107,7 @@ export function createProtectiveDsp(sumAnalysis, ceilingDbfs = -0.3) {
       dry_wet: 100,
       attack: 0.003,
       release: 0.3,
-      ratio: 1,
+      ratio: 3,
       hp_cutoff: 20,
     },
     limiter: {

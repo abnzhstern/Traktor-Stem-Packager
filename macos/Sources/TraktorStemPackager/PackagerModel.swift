@@ -13,6 +13,9 @@ final class PackagerModel: ObservableObject {
     }
 
     @Published var files: [AudioRole: URL] = [:]
+    @Published var mode: PackagingMode = .portableAAC
+    @Published var collectionURL: URL?
+    @Published var stemsDirectoryURL: URL?
     @Published var title = ""
     @Published var artist = ""
     @Published var album = ""
@@ -29,8 +32,39 @@ final class PackagerModel: ObservableObject {
     @Published var statusText = "Add the master and four matching stereo stems."
     private var extractedArtworkURL: URL?
 
+    init() {
+        let manager = FileManager.default
+        let home = manager.homeDirectoryForCurrentUser
+        let nativeInstruments = home.appending(path: "Documents/Native Instruments")
+        if let folders = try? manager.contentsOfDirectory(
+            at: nativeInstruments,
+            includingPropertiesForKeys: [.contentModificationDateKey],
+            options: [.skipsHiddenFiles]
+        ) {
+            collectionURL = folders
+                .filter { $0.lastPathComponent.hasPrefix("Traktor ") }
+                .map { $0.appending(path: "collection.nml") }
+                .filter { manager.fileExists(atPath: $0.path) }
+                .sorted { $0.deletingLastPathComponent().lastPathComponent > $1.deletingLastPathComponent().lastPathComponent }
+                .first
+        }
+        let defaultStems = home.appending(path: "Music/Traktor/Stems")
+        if manager.fileExists(atPath: defaultStems.path) { stemsDirectoryURL = defaultStems }
+    }
+
     var hasAllFiles: Bool { AudioRole.allCases.allSatisfy { files[$0] != nil } }
-    var canCreate: Bool { state == .ready && hasAllFiles }
+    var canCreate: Bool {
+        state == .ready && hasAllFiles &&
+            (mode == .portableAAC || (collectionURL != nil && stemsDirectoryURL != nil))
+    }
+
+    func setMode(_ newMode: PackagingMode) {
+        mode = newMode
+        report = nil
+        state = .waiting
+        statusText = hasAllFiles ? "Checking compatibility…" : "Add the remaining audio files."
+        if hasAllFiles { Task { await validate() } }
+    }
 
     func setFile(_ url: URL, for role: AudioRole) {
         files[role] = url
@@ -106,7 +140,7 @@ final class PackagerModel: ObservableObject {
         statusText = "Checking sample rate, channels, duration and stem-sum peak…"
         do {
             let bridge = try EngineBridge()
-            let result = try await bridge.validate(files: files)
+            let result = try await bridge.validate(files: files, mode: mode)
             report = result
             state = .ready
             statusText = result.limiterEnabled
@@ -120,6 +154,10 @@ final class PackagerModel: ObservableObject {
 
     func create() async {
         guard canCreate else { return }
+        if mode == .nativeLossless {
+            await createNativeLossless()
+            return
+        }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.mpeg4Movie]
         panel.nameFieldStringValue = sanitizedOutputName()
@@ -149,6 +187,39 @@ final class PackagerModel: ObservableObject {
             }
             state = .complete(destination)
             statusText = "Traktor Stem file created successfully."
+        } catch {
+            state = .failed(error.localizedDescription)
+            statusText = error.localizedDescription
+        }
+    }
+
+    private func createNativeLossless() async {
+        guard let collectionURL, let stemsDirectoryURL else { return }
+        let warning = NSAlert()
+        warning.messageText = "Install lossless linked stems into Traktor?"
+        warning.informativeText = "Quit Traktor Pro 4 first. The app will back up collection.nml, install the lossless sidecar in the selected Stems folder, and link it to the exact master track."
+        warning.alertStyle = .warning
+        warning.addButton(withTitle: "Install Test")
+        warning.addButton(withTitle: "Cancel")
+        guard warning.runModal() == .alertFirstButtonReturn else { return }
+
+        state = .packaging
+        statusText = "Creating and installing native-linked ALAC stems…"
+        do {
+            let bridge = try EngineBridge()
+            let result = try await bridge.packageNativeLossless(
+                files: files,
+                collection: collectionURL,
+                stemsDirectory: stemsDirectoryURL,
+                stemNames: stemNames
+            ) { message in
+                Task { @MainActor in
+                    if !message.isEmpty { self.statusText = message }
+                }
+            }
+            let destination = URL(fileURLWithPath: result.destination)
+            state = .complete(destination)
+            statusText = "Lossless linked stems installed. Open Traktor and load the original track."
         } catch {
             state = .failed(error.localizedDescription)
             statusText = error.localizedDescription

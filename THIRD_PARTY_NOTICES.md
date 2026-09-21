@@ -13,3 +13,9 @@ The build downloads the pinned macOS arm64 binaries published by `eugeneware/ffm
 ## stem-mp4
 
 The vendored `stem-mp4` package is distributed under the MIT License. Its license is retained at `vendor/stem-mp4/LICENSE`.
+
+## Traktor native linked-stem path interoperability
+
+The `AUDIO_ID` to native linked-stem path implementation was informed by the independently reverse-engineered, MIT-licensed `traktor-stem-bridge` project by Thanh Nha and cross-checked against the MIT-licensed `deepvm/stems` project. See <https://github.com/zicez/traktor-stem-bridge> and <https://github.com/deepvm/stems>.
+
+`traktor-stem-bridge` copyright © 2026 Thanh Nha. Its MIT license is retained at `vendor/traktor-stem-bridge/LICENSE`.

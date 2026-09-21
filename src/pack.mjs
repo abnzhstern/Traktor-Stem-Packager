@@ -6,9 +6,10 @@ import { mkdtemp } from 'node:fs/promises';
 import { StemMp4Writer } from 'stem-mp4';
 import { analyzeStemSum, createProtectiveDsp, encodeAac, probeAudio, validateSet } from './media.mjs';
 import { readMasterMetadata } from './metadata.mjs';
+import { createNativeLinkedAlac } from './native-link.mjs';
 
 function usage() {
-  console.error('Usage: node src/pack.mjs --master FILE --drums FILE --bass FILE --other FILE --vocals FILE [--output FILE] [--validate-only true] [--title TITLE] [--artist ARTIST] [--album ALBUM] [--release-date DATE] [--producer PRODUCER] [--label LABEL] [--genre GENRE] [--drums-name NAME] [--bass-name NAME] [--other-name NAME] [--vocals-name NAME]');
+  console.error('Usage: node src/pack.mjs --master FILE --drums FILE --bass FILE --other FILE --vocals FILE [--output FILE] [--mode portable-aac|native-alac] [--collection FILE --stems-dir DIR] [--validate-only true] [--title TITLE] [--artist ARTIST] [--album ALBUM] [--release-date DATE] [--producer PRODUCER] [--label LABEL] [--genre GENRE] [--drums-name NAME] [--bass-name NAME] [--other-name NAME] [--vocals-name NAME]');
 }
 
 function parseArgs(argv) {
@@ -25,8 +26,14 @@ const trackNames = ['master', 'drums', 'bass', 'other', 'vocals'];
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  const mode = args.mode || 'portable-aac';
   const validateOnly = args['validate-only'] === 'true';
-  const required = validateOnly ? trackNames : [...trackNames, 'output'];
+  if (!['portable-aac', 'native-alac'].includes(mode)) throw new Error(`Unknown packaging mode: ${mode}`);
+  const required = validateOnly
+    ? trackNames
+    : mode === 'native-alac'
+      ? [...trackNames, 'collection', 'stems-dir']
+      : [...trackNames, 'output'];
   const missing = required.filter((name) => !args[name]);
   if (missing.length) {
     usage();
@@ -47,6 +54,13 @@ async function main() {
   );
   const info = Object.fromEntries(probedEntries);
   const common = validateSet(info);
+  if (mode === 'native-alac') {
+    const incompatible = Object.entries(info).filter(([, track]) =>
+      track.sampleRate !== 44100 || (track.bitsPerSample && track.bitsPerSample !== 16));
+    if (incompatible.length) {
+      throw new Error('Lossless linked mode currently requires five matching stereo 16-bit/44.1 kHz sources.');
+    }
+  }
 
   console.log(`Validated five stereo tracks: ${common.sampleRate} Hz, ${common.duration.toFixed(3)} seconds`);
   console.log('Analyzing the unprocessed four-stem sum…');
@@ -76,6 +90,30 @@ async function main() {
   const work = await mkdtemp(join(tmpdir(), 'traktor-stem-packager-'));
 
   try {
+    if (mode === 'native-alac') {
+      console.log('Creating lossless ALAC streams in Traktor native-linked format…');
+      const stemNames = [
+        args['drums-name'] || 'Drums',
+        args['bass-name'] || 'Bass',
+        args['other-name'] || 'Other',
+        args['vocals-name'] || 'Vocals',
+      ];
+      const result = await createNativeLinkedAlac({
+        inputs,
+        collectionPath: resolve(args.collection),
+        stemsDirectory: resolve(args['stems-dir']),
+        temporaryDirectory: work,
+        ffmpeg,
+        ffprobe,
+        masteringDsp,
+        stemNames,
+      });
+      console.log(`Installed linked Stem file: ${result.destination}`);
+      console.log(`Collection backup: ${result.collectionBackup}`);
+      console.log(`NATIVE_RESULT ${JSON.stringify(result)}`);
+      return;
+    }
+
     const encoded = {};
     for (const name of trackNames) {
       const path = join(work, `${name}.m4a`);

@@ -51,8 +51,8 @@ struct EngineBridge {
         return try JSONDecoder().decode(MasterMetadata.self, from: Data(json.utf8))
     }
 
-    func validate(files: [AudioRole: URL]) async throws -> ValidationReport {
-        let result = try await run(files: files, output: nil, validateOnly: true, progress: nil)
+    func validate(files: [AudioRole: URL], mode: PackagingMode = .portableAAC) async throws -> ValidationReport {
+        let result = try await run(files: files, output: nil, validateOnly: true, mode: mode, progress: nil)
         guard let marker = result.split(separator: "\n").first(where: { $0.hasPrefix("VALIDATION_RESULT ") }) else {
             throw EngineError.invalidResponse
         }
@@ -75,7 +75,7 @@ struct EngineBridge {
         progress: @escaping @Sendable (String) -> Void
     ) async throws {
         _ = try await run(
-            files: files, output: output, validateOnly: false,
+            files: files, output: output, validateOnly: false, mode: .portableAAC,
             metadata: [
                 "title": title, "artist": artist, "album": album, "genre": genre,
                 "release-date": releaseDate, "producer": producer, "label": label
@@ -84,13 +84,40 @@ struct EngineBridge {
         )
     }
 
+    func packageNativeLossless(
+        files: [AudioRole: URL],
+        collection: URL,
+        stemsDirectory: URL,
+        stemNames: [AudioRole: String],
+        progress: @escaping @Sendable (String) -> Void
+    ) async throws -> NativePackageResult {
+        let result = try await run(
+            files: files,
+            output: nil,
+            validateOnly: false,
+            mode: .nativeLossless,
+            stemNames: stemNames,
+            collection: collection,
+            stemsDirectory: stemsDirectory,
+            progress: progress
+        )
+        guard let marker = result.split(separator: "\n").first(where: { $0.hasPrefix("NATIVE_RESULT ") }) else {
+            throw EngineError.invalidResponse
+        }
+        let json = marker.dropFirst("NATIVE_RESULT ".count)
+        return try JSONDecoder().decode(NativePackageResult.self, from: Data(json.utf8))
+    }
+
     private func run(
         files: [AudioRole: URL],
         output: URL?,
         validateOnly: Bool,
+        mode: PackagingMode = .portableAAC,
         metadata: [String: String] = [:],
         stemNames: [AudioRole: String] = [:],
         artwork: URL? = nil,
+        collection: URL? = nil,
+        stemsDirectory: URL? = nil,
         progress: (@Sendable (String) -> Void)?
     ) async throws -> String {
         try requireComponents()
@@ -99,11 +126,14 @@ struct EngineBridge {
             guard let url = files[role] else { throw EngineError.failed("Missing \(role.rawValue) file.") }
             arguments += ["--\(role.commandName)", url.path]
         }
+        arguments += ["--mode", mode.commandName]
         if validateOnly {
             arguments += ["--validate-only", "true"]
         } else if let output {
             arguments += ["--output", output.path]
         }
+        if let collection { arguments += ["--collection", collection.path] }
+        if let stemsDirectory { arguments += ["--stems-dir", stemsDirectory.path] }
         for key in ["title", "artist", "album", "genre", "release-date", "producer", "label"] {
             if let value = metadata[key], !value.isEmpty { arguments += ["--\(key)", value] }
         }
@@ -171,4 +201,11 @@ struct MasterMetadata: Decodable {
     let genre: String
     let artworkBase64: String?
     let artworkMimeType: String?
+}
+
+struct NativePackageResult: Decodable {
+    let destination: String
+    let collectionBackup: String
+    let stemBackup: String?
+    let relativePath: String
 }

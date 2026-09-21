@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - experimental/native-alac-linked
   pull_request:
     branches:
       - main
@@ -43,7 +44,7 @@ jobs:
           test -f "$APP/Contents/Resources/AppIcon.icns"
           test "$(plutil -extract CFBundleDisplayName raw "$APP/Contents/Info.plist")" = "Traktor Stem Packager"
           test "$(plutil -extract CFBundleIconFile raw "$APP/Contents/Info.plist")" = "AppIcon"
-          test "$(plutil -extract CFBundleShortVersionString raw "$APP/Contents/Info.plist")" = "0.5.0"
+          test "$(plutil -extract CFBundleShortVersionString raw "$APP/Contents/Info.plist")" = "0.6.0-beta.1"
           codesign --verify --deep --strict "$APP"
           file "$APP/Contents/MacOS/TraktorStemPackager" | grep arm64
           file "$APP/Contents/Resources/Runtime/node" | grep arm64
@@ -58,16 +59,17 @@ jobs:
           ditto "macos/build/Traktor Stem Packager.app" "$DIST/Traktor Stem Packager.app"
           cp "macos/installer/Install Traktor Stem Packager.command" "$DIST/"
           cp "macos/installer/README.txt" "$DIST/"
+          cp "macos/installer/LOSSLESS-TEST-NOTES.txt" "$DIST/"
           chmod +x "$DIST/Install Traktor Stem Packager.command"
-          ditto -c -k --sequesterRsrc --keepParent "$DIST" "Traktor-Stem-Packager-0.5.0-macOS-Apple-Silicon.zip"
-          shasum -a 256 "Traktor-Stem-Packager-0.5.0-macOS-Apple-Silicon.zip" > "Traktor-Stem-Packager-0.5.0-macOS-Apple-Silicon.zip.sha256"
+          ditto -c -k --sequesterRsrc --keepParent "$DIST" "Traktor-Stem-Packager-0.6.0-beta.1-native-ALAC-test.zip"
+          shasum -a 256 "Traktor-Stem-Packager-0.6.0-beta.1-native-ALAC-test.zip" > "Traktor-Stem-Packager-0.6.0-beta.1-native-ALAC-test.zip.sha256"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Traktor-Stem-Packager-0.5.0-macOS-Apple-Silicon
+          name: Traktor-Stem-Packager-0.6.0-beta.1-native-ALAC-test
           path: |
-            Traktor-Stem-Packager-0.5.0-macOS-Apple-Silicon.zip
-            Traktor-Stem-Packager-0.5.0-macOS-Apple-Silicon.zip.sha256
+            Traktor-Stem-Packager-0.6.0-beta.1-native-ALAC-test.zip
+            Traktor-Stem-Packager-0.6.0-beta.1-native-ALAC-test.zip.sha256
           if-no-files-found: error
           retention-days: 14

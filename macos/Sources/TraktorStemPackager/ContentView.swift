@@ -15,7 +15,12 @@ struct ContentView: View {
             titleBar
             ScrollView {
                 VStack(spacing: 14) {
-                    metadataPanel
+                    modePanel
+                    if model.mode == .portableAAC {
+                        metadataPanel
+                    } else {
+                        nativeConfigPanel
+                    }
                     tracksPanel
                     statusPanel
                 }
@@ -41,6 +46,71 @@ struct ContentView: View {
                 message: Text(notice.message),
                 dismissButton: .default(Text("OK"))
             )
+        }
+    }
+
+    private var modePanel: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Picker("Output", selection: Binding(
+                get: { model.mode },
+                set: { model.setMode($0) }
+            )) {
+                ForEach(PackagingMode.allCases) { mode in
+                    Text(mode.title).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            Text(model.mode == .portableAAC
+                 ? "Creates a portable five-track Stem file using AAC 256 kbps."
+                 : "Experimental: installs 16-bit/44.1 kHz ALAC stems as a sidecar linked to the original track in Traktor Pro 4.")
+                .font(.system(size: 10))
+                .foregroundStyle(Color.white.opacity(0.42))
+        }
+        .padding(12)
+        .background(panel)
+    }
+
+    private var nativeConfigPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("TRAKTOR NATIVE LINK")
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(1.0)
+                .foregroundStyle(Color.white.opacity(0.45))
+            pathRow(
+                label: "Collection",
+                url: model.collectionURL,
+                emptyText: "Choose collection.nml",
+                action: chooseCollection
+            )
+            pathRow(
+                label: "Stems folder",
+                url: model.stemsDirectoryURL,
+                emptyText: "Choose Traktor’s configured Stems folder",
+                action: chooseStemsDirectory
+            )
+            Text("The selected master must already be imported and analyzed in this collection. Traktor must be closed during installation. A collection backup is created automatically.")
+                .font(.system(size: 10))
+                .foregroundStyle(Color.white.opacity(0.4))
+        }
+        .padding(14)
+        .background(panel)
+    }
+
+    private func pathRow(label: String, url: URL?, emptyText: String, action: @escaping () -> Void) -> some View {
+        HStack(spacing: 10) {
+            Text(label)
+                .font(.system(size: 11))
+                .foregroundStyle(Color.white.opacity(0.4))
+                .frame(width: 78, alignment: .trailing)
+            Text(url?.path(percentEncoded: false) ?? emptyText)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(url == nil ? Color.white.opacity(0.32) : Color.white.opacity(0.72))
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button("CHOOSE", action: action)
+                .font(.system(size: 9, weight: .semibold))
         }
     }
 
@@ -186,7 +256,9 @@ struct ContentView: View {
             if case .complete = model.state {
                 Button("SHOW IN FINDER") { model.revealOutput() }
             }
-            Button("EXPORT STEM.MP4") { Task { await model.create() } }
+            Button(model.mode == .portableAAC ? "EXPORT STEM.MP4" : "INSTALL LINKED STEMS") {
+                Task { await model.create() }
+            }
                 .buttonStyle(.borderedProminent)
                 .tint(Color(red: 0.32, green: 0.34, blue: 0.37))
                 .disabled(!model.canCreate)
@@ -208,6 +280,25 @@ struct ContentView: View {
         panel.allowedContentTypes = [.jpeg, .png]
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK { model.setArtwork(panel.url) }
+    }
+
+    private func chooseCollection() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.xml]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.message = "Choose Traktor Pro 4 collection.nml"
+        if panel.runModal() == .OK { model.collectionURL = panel.url }
+    }
+
+    private func chooseStemsDirectory() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.message = "Choose the Stems folder configured in Traktor Pro 4"
+        if panel.runModal() == .OK { model.stemsDirectoryURL = panel.url }
     }
 
     private var statusIcon: String {

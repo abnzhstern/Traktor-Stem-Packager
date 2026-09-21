@@ -1,6 +1,25 @@
 import Foundation
 import SwiftUI
 
+enum PackagingMode: String, CaseIterable, Identifiable {
+    case portableAAC
+    case nativeLossless
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .portableAAC: "Portable AAC"
+        case .nativeLossless: "Lossless Linked (Test)"
+        }
+    }
+    var commandName: String {
+        switch self {
+        case .portableAAC: "portable-aac"
+        case .nativeLossless: "native-alac"
+        }
+    }
+}
+
 enum AudioRole: String, CaseIterable, Identifiable {
     case master = "Master"
     case drums = "Drums"
