@@ -54,8 +54,8 @@ jobs:
           test "$(plutil -extract CFBundleDisplayName raw "$APP/Contents/Info.plist")" = "Traktor Stem Packager"
           test "$(plutil -extract CFBundleIconFile raw "$APP/Contents/Info.plist")" = "AppIcon"
           test "$(plutil -extract CFBundleShortVersionString raw "$APP/Contents/Info.plist")" = "0.6.0-beta.2"
-          strings "$APP/Contents/MacOS/TraktorStemPackager" | grep -F "v0.6.0-beta.2"
-          strings "$APP/Contents/MacOS/TraktorStemPackager" | grep -F "Lossless ALAC (Linked Test)"
+          grep -F 'Text("v0.6.0-beta.2")' macos/Sources/TraktorStemPackager/ContentView.swift
+          grep -F 'case .nativeLossless: "Lossless ALAC (Linked Test)"' macos/Sources/TraktorStemPackager/AudioRole.swift
           codesign --verify --deep --strict "$APP"
           file "$APP/Contents/MacOS/TraktorStemPackager" | grep arm64
           file "$APP/Contents/Resources/Runtime/node" | grep arm64
