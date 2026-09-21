@@ -28,7 +28,7 @@ struct ContentView: View {
             }
             footer
         }
-        .frame(minWidth: 760, minHeight: 660)
+        .frame(minWidth: 760, minHeight: 720)
         .background(background)
         .preferredColorScheme(.dark)
         .task { await updateChecker.checkAutomatically() }
@@ -62,7 +62,7 @@ struct ContentView: View {
             .pickerStyle(.segmented)
 
             Text(model.mode == .portableAAC
-                 ? "Creates a portable five-track Stem file using AAC 256 kbps."
+                 ? "Creates a portable five-track .stem.mp4 using Apple AAC at 320 kbps CBR."
                  : "Experimental: installs 16-bit/44.1 kHz ALAC stems as a sidecar linked to the original track in Traktor Pro 4.")
                 .font(.system(size: 10))
                 .foregroundStyle(Color.white.opacity(0.42))
@@ -131,9 +131,14 @@ struct ContentView: View {
                     .foregroundStyle(Color.white.opacity(0.46))
             }
             Spacer()
-            Text("TRAKTOR-READY .STEM.MP4")
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(Color.white.opacity(0.35))
+            VStack(alignment: .trailing, spacing: 4) {
+                Text("v0.6.0-beta.2")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Color.white.opacity(0.62))
+                Text("AAC + LOSSLESS ALAC TEST")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.35))
+            }
         }
         .padding(.horizontal, 16)
         .frame(height: 72)

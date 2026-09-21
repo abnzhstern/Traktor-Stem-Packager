@@ -16,7 +16,8 @@ The current build supports **Apple Silicon Macs** running **macOS 14 or newer**.
 - Validates sample rate, channel count, duration, and synchronization-critical properties
 - Reads title, artist, album, release date, producer, label, genre, and artwork from the stereo master
 - Lets you edit metadata and stem display names before packaging
-- Encodes five 256 kbps AAC streams and writes Native Instruments Stem metadata
+- Portable mode encodes five Apple AudioToolbox AAC streams at 320 kbps CBR and writes Native Instruments Stem metadata
+- Experimental lossless mode stores 16-bit/44.1 kHz ALAC streams in Traktor's configured Stems folder and safely links them to an existing track in `collection.nml`
 - Measures the unprocessed four-stem sum and enables limiter protection only when needed
 - Creates a Traktor-compatible `.stem.mp4`
 
@@ -62,6 +63,8 @@ macos/scripts/build-app.sh
 ```
 
 The completed app is written to `macos/build/Traktor Stem Packager.app`.
+
+Portable AAC remains the shareable standalone `.stem.mp4` option. Lossless ALAC is an experimental linked mode: the original master must already be imported and analyzed in Traktor Pro 4, Traktor must be closed during installation, and the app creates a timestamped collection backup before making the link.
 
 The command-line packaging engine can also be run directly:
 

@@ -5,7 +5,8 @@ This is an experimental test build. Do not share it publicly yet.
 Before testing:
 1. Import the original stereo master into Traktor Pro 4 and analyze it.
 2. Quit Traktor Pro 4 completely.
-3. Open Traktor Stem Packager and select “Lossless Linked (Test).”
+3. Confirm the app title bar says v0.6.0-beta.2, then select
+   “Lossless ALAC (Linked Test).”
 4. Choose the collection.nml used by that Traktor installation.
 5. Choose the Stems folder configured in Traktor Pro 4 Preferences.
 6. Add the original master plus the four matching 16-bit/44.1 kHz stems.

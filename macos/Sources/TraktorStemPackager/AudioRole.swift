@@ -8,8 +8,8 @@ enum PackagingMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .portableAAC: "Portable AAC"
-        case .nativeLossless: "Lossless Linked (Test)"
+        case .portableAAC: "Portable AAC 320 CBR"
+        case .nativeLossless: "Lossless ALAC (Linked Test)"
         }
     }
     var commandName: String {

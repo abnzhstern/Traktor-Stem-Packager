@@ -67,8 +67,9 @@ export async function encodeAac(input, output, ffmpeg = 'ffmpeg') {
     '-i', input,
     '-map_metadata', '-1',
     '-vn',
-    '-c:a', 'aac',
-    '-b:a', '256k',
+    '-c:a', 'aac_at',
+    '-aac_at_mode', 'cbr',
+    '-b:a', '320k',
     '-movflags', '+faststart',
     output,
   ], { maxBuffer: 16 * 1024 * 1024 });
