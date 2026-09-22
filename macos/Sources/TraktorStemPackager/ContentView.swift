@@ -151,6 +151,9 @@ struct ContentView: View {
     private var nativeReadinessMessage: String {
         if model.files[.master] == nil { return "Add the exact stereo master used in Traktor" }
         if model.collectionURL == nil { return "Choose the Traktor collection first" }
+        if model.traktorRunning && model.nativeReadiness?.ready == false {
+            return "Analysis may not be saved yet — close Traktor to refresh"
+        }
         return model.nativeReadiness?.message ?? "Checking the selected collection…"
     }
 
@@ -205,7 +208,7 @@ struct ContentView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("v0.6.0-beta.3")
+                Text("v0.6.0-beta.4")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.62))
                 Text("PORTABLE + VERIFIED LOSSLESS")
@@ -334,12 +337,12 @@ struct ContentView: View {
             if case .complete = model.state {
                 Button("SHOW IN FINDER") { model.revealOutput() }
             }
-            Button(model.mode == .portableAAC ? "CREATE PORTABLE STEM FILE" : "VERIFY & INSTALL LOSSLESS STEMS") {
+            Button(model.primaryActionTitle) {
                 Task { await model.create() }
             }
                 .buttonStyle(.borderedProminent)
                 .tint(Color(red: 0.32, green: 0.34, blue: 0.37))
-                .disabled(!model.canCreate)
+                .disabled(!(model.canCreate || model.canResolveUnsavedAnalysis))
         }
         .padding(.horizontal, 16)
         .frame(minHeight: 58)

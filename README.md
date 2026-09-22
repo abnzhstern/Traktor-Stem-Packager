@@ -20,6 +20,7 @@ The current build supports **Apple Silicon Macs** running **macOS 14 or newer**.
 - Experimental lossless mode accepts only uncompressed PCM WAV/AIFF sources in a tested profile (16-bit/44.1 kHz or 24-bit/48 kHz), stores them as ALAC in Traktor's configured Stems folder, and safely links them to an existing track in `collection.nml`
 - Decodes and SHA-256 verifies every packaged lossless stream against its source before installation
 - Can ask Traktor to save and quit normally before installation, then relaunch it afterward
+- Detects when a newly analyzed track ID has not yet been saved, then closes Traktor, rechecks the collection, and continues automatically
 - Measures the unprocessed four-stem sum and enables limiter protection only when needed
 - Creates a Traktor-compatible `.stem.mp4`
 

@@ -6,7 +6,7 @@ Before testing:
 1. Import the original stereo master into Traktor Pro 4 and analyze it.
 2. Leave Traktor open or close it. If it is open, the app will ask it to save and
    quit normally before installation, then reopen it afterward.
-3. Confirm the app title bar says v0.6.0-beta.3, then select
+3. Confirm the app title bar says v0.6.0-beta.4, then select
    “Lossless Traktor Installation.”
 4. Choose the collection.nml used by that Traktor installation.
 5. Choose the Stems folder configured in Traktor Pro 4 Preferences.
@@ -19,6 +19,10 @@ The app creates a timestamped backup of collection.nml before changing it. If a
 linked stem file already exists for the track, that file is backed up too.
 Before installing, it decodes all five packaged ALAC streams and requires their
 PCM SHA-256 hashes to match the five source files exactly.
+
+If Traktor is still open after analyzing the master, the analysis may not yet
+be written to collection.nml. Choose SAVE, CLOSE TRAKTOR & CONTINUE. The app
+will let Traktor save normally, recheck the track ID, install, and reopen it.
 
 For this test, confirm:
 • The linked-stems icon appears beside the original track.

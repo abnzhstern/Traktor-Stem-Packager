@@ -62,6 +62,18 @@ final class PackagerModel: ObservableObject {
             (mode == .portableAAC || (collectionURL != nil && stemsDirectoryURL != nil && nativeReadiness?.ready == true))
     }
 
+    var canResolveUnsavedAnalysis: Bool {
+        state == .ready && mode == .nativeLossless && hasAllFiles &&
+            collectionURL != nil && stemsDirectoryURL != nil &&
+            traktorRunning && nativeReadiness?.ready == false
+    }
+
+    var primaryActionTitle: String {
+        if mode == .portableAAC { return "CREATE PORTABLE STEM FILE" }
+        if canResolveUnsavedAnalysis { return "SAVE, CLOSE TRAKTOR & CONTINUE" }
+        return "VERIFY & INSTALL LOSSLESS STEMS"
+    }
+
     func setMode(_ newMode: PackagingMode) {
         mode = newMode
         report = nil
@@ -196,7 +208,7 @@ final class PackagerModel: ObservableObject {
     }
 
     func create() async {
-        guard canCreate else { return }
+        guard canCreate || canResolveUnsavedAnalysis else { return }
         if mode == .nativeLossless {
             await createNativeLossless()
             return
@@ -242,15 +254,22 @@ final class PackagerModel: ObservableObject {
         let traktor = runningTraktorApplication()
         let shouldRelaunch = traktor != nil
         let traktorURL = traktor?.bundleURL
+        let needsSavedAnalysisRefresh = nativeReadiness?.ready != true
         let warning = NSAlert()
-        warning.messageText = traktor == nil
+        warning.messageText = needsSavedAnalysisRefresh && traktor != nil
+            ? "Save Traktor’s analysis and continue?"
+            : traktor == nil
             ? "Verify and install lossless stems?"
             : "Close Traktor and install lossless stems?"
-        warning.informativeText = traktor == nil
+        warning.informativeText = needsSavedAnalysisRefresh && traktor != nil
+            ? "Traktor appears to have analyzed the master without saving its new track ID to collection.nml. The app will ask Traktor to quit normally, recheck the saved analysis, install the linked stems, then reopen Traktor."
+            : traktor == nil
             ? "The app will verify all five decoded PCM streams, back up collection.nml, install the lossless sidecar, and link it to the exact master track."
             : "The app will ask Traktor to quit normally so it can save the collection, verify all five decoded PCM streams, install the linked stems, then reopen Traktor."
         warning.alertStyle = .warning
-        warning.addButton(withTitle: traktor == nil ? "Verify & Install" : "Close Traktor & Install")
+        warning.addButton(withTitle: needsSavedAnalysisRefresh && traktor != nil
+            ? "Save, Close & Continue"
+            : traktor == nil ? "Verify & Install" : "Close Traktor & Install")
         warning.addButton(withTitle: "Cancel")
         guard warning.runModal() == .alertFirstButtonReturn else { return }
 
@@ -262,6 +281,20 @@ final class PackagerModel: ObservableObject {
             } catch {
                 state = .failed(error.localizedDescription)
                 statusText = error.localizedDescription
+                return
+            }
+        }
+        if needsSavedAnalysisRefresh {
+            statusText = "Rechecking Traktor’s saved track analysis…"
+            let readiness = await recheckNativeReadinessAfterTraktorQuit(
+                master: files[.master],
+                collection: collectionURL
+            )
+            guard readiness?.ready == true else {
+                state = .ready
+                statusText = readiness?.message ?? "Could not recheck the saved Traktor collection."
+                if shouldRelaunch, let traktorURL { _ = NSWorkspace.shared.open(traktorURL) }
+                refreshTraktorStatus()
                 return
             }
         }
@@ -289,6 +322,28 @@ final class PackagerModel: ObservableObject {
             state = .failed(error.localizedDescription)
             statusText = error.localizedDescription
         }
+    }
+
+    private func recheckNativeReadinessAfterTraktorQuit(
+        master: URL?,
+        collection: URL
+    ) async -> NativeReadiness? {
+        guard let master else { return nil }
+        for attempt in 0..<8 {
+            do {
+                let result = try await EngineBridge().checkNativeReadiness(master: master, collection: collection)
+                nativeReadiness = result
+                if result.ready { return result }
+                if attempt < 7 { try await Task.sleep(nanoseconds: 250_000_000) }
+            } catch {
+                nativeReadiness = NativeReadiness(
+                    ready: false, found: false, hasAudioId: false,
+                    message: error.localizedDescription
+                )
+                if attempt < 7 { try? await Task.sleep(nanoseconds: 250_000_000) }
+            }
+        }
+        return nativeReadiness
     }
 
     private func runningTraktorApplication() -> NSRunningApplication? {
