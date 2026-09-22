@@ -39,10 +39,12 @@ struct EngineBridge {
         }
     }
 
-    func checkNativeReadiness(master: URL, collection: URL) async throws -> NativeReadiness {
+    func checkNativeReadiness(master: URL, collection: URL, stemsDirectory: URL? = nil) async throws -> NativeReadiness {
         try requireComponents()
+        var arguments = [nativeCheckEngine.path, "--master", master.path, "--collection", collection.path]
+        if let stemsDirectory { arguments += ["--stems-dir", stemsDirectory.path] }
         let result = try await execute(
-            arguments: [nativeCheckEngine.path, "--master", master.path, "--collection", collection.path],
+            arguments: arguments,
             progress: nil
         )
         guard let marker = result.split(separator: "\n").first(where: { $0.hasPrefix("NATIVE_READINESS_RESULT ") }) else {

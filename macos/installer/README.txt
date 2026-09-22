@@ -59,7 +59,9 @@ LOSSLESS TRAKTOR HANDOFF
 
 The lossless workflow checks Traktor's collection first. If the exact master is already analyzed, the import step is skipped.
 
-If it is not present, Guided Drag opens Traktor and highlights the exact master in Finder so you can drag it into Traktor. Automatic Import is an optional repeated-use workflow. The app explains its one-time Traktor Preferences setup on screen, creates a permanent Music Folder for imported masters, and starts Traktor so it can import and analyze the track at launch. Keep those copied masters in that folder because Traktor links to them there.
+If it is not present, choose Drag Master into Traktor. The app opens Traktor and brings Finder to the foreground with the exact master highlighted. Drag it into Traktor's Track Collection and let analysis finish. Return to the app and choose Save, Quit Traktor & Install; the app waits for Traktor to save, verifies the track ID, and installs the lossless stems.
+
+If linked stems already exist for that master, the app asks before replacing them. A timestamped .bak file is a safety backup of the previous linked Stem file, not a second active Stem set.
 
 Traktor must close before the app edits collection.nml. At that step you can choose:
 • I’ll Quit Traktor — avoids the macOS App Management permission. Quit Traktor normally and the app will detect it and continue automatically.

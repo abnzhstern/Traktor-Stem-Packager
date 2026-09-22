@@ -36,15 +36,12 @@ final class PackagerModel: ObservableObject {
     @Published var validationProblemRoles: Set<AudioRole> = []
     @Published var folderImportNeedsReview = false
     @Published var waitingForManualTraktorQuit = false
-    @Published var automaticImportConfigured: Bool
-    @Published var automaticImportSetupInProgress = false
     private var extractedArtworkURL: URL?
     private var readinessTask: Task<Void, Never>?
 
     init() {
         let manager = FileManager.default
         let home = manager.homeDirectoryForCurrentUser
-        automaticImportConfigured = UserDefaults.standard.bool(forKey: "automaticTraktorImportConfigured")
         let nativeInstruments = home.appending(path: "Documents/Native Instruments")
         if let folders = try? manager.contentsOfDirectory(
             at: nativeInstruments,
@@ -64,10 +61,6 @@ final class PackagerModel: ObservableObject {
     }
 
     var hasAllFiles: Bool { AudioRole.allCases.allSatisfy { files[$0] != nil } }
-    var automaticImportDirectory: URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appending(path: "Music/Traktor Stem Packager Masters", directoryHint: .isDirectory)
-    }
     var audioSetValidated: Bool {
         guard hasAllFiles, report != nil else { return false }
         switch state {
@@ -269,6 +262,7 @@ final class PackagerModel: ObservableObject {
 
     func setStemsDirectory(_ url: URL?) {
         stemsDirectoryURL = url
+        refreshNativeReadiness()
     }
 
     func refreshTraktorStatus() {
@@ -297,7 +291,9 @@ final class PackagerModel: ObservableObject {
               let collection = collectionURL else { return }
         readinessTask = Task { [weak self] in
             do {
-                let result = try await EngineBridge().checkNativeReadiness(master: master, collection: collection)
+                let result = try await EngineBridge().checkNativeReadiness(
+                    master: master, collection: collection, stemsDirectory: self?.stemsDirectoryURL
+                )
                 guard !Task.isCancelled,
                       self?.files[.master] == master,
                       self?.collectionURL == collection else { return }
@@ -305,7 +301,7 @@ final class PackagerModel: ObservableObject {
             } catch {
                 guard !Task.isCancelled else { return }
                 self?.nativeReadiness = NativeReadiness(
-                    ready: false, found: false, hasAudioId: false,
+                    ready: false, found: false, hasAudioId: false, linkedStemExists: false,
                     message: error.localizedDescription
                 )
             }
@@ -327,22 +323,59 @@ final class PackagerModel: ObservableObject {
         statusText = "Checking Traktor’s saved collection for this exact master…"
         recoveryText = nil
         do {
-            let result = try await EngineBridge().checkNativeReadiness(master: master, collection: collectionURL)
+            let result = try await EngineBridge().checkNativeReadiness(
+                master: master, collection: collectionURL, stemsDirectory: stemsDirectoryURL
+            )
             nativeReadiness = result
             refreshTraktorStatus()
             if result.ready {
                 statusText = "Analyzed master found. Add or confirm the four stems, then continue."
             } else if traktorRunning {
                 statusText = "The analyzed master is not in Traktor’s saved collection yet. Finish analysis, then save or close Traktor."
-                recoveryText = "After analysis finishes, return here and choose Check Traktor Again. If it is still not found, use Save, Close Traktor & Continue."
+                recoveryText = "Traktor usually writes the new track ID when it saves its collection. Use Save, Quit Traktor & Continue below; the app will detect the closure and recheck automatically."
             } else {
                 statusText = result.message
-                recoveryText = "Choose the guided drag or automatic-import option below. After Traktor analyzes the exact master and saves its collection, check again."
+                recoveryText = "Choose Drag Master into Traktor below, import and analyze that exact file, then return here."
             }
         } catch {
-            nativeReadiness = NativeReadiness(ready: false, found: false, hasAudioId: false, message: error.localizedDescription)
+            nativeReadiness = NativeReadiness(ready: false, found: false, hasAudioId: false, linkedStemExists: false, message: error.localizedDescription)
             statusText = "Traktor’s collection could not be checked."
             recoveryText = "Confirm the Collection path points to collection.nml, then choose Check Traktor Again."
+        }
+    }
+
+    func saveAndQuitAfterAnalysis() async {
+        refreshTraktorStatus()
+        guard let traktor = runningTraktorApplication(), let collectionURL else {
+            await checkTraktorForMaster()
+            return
+        }
+
+        let prompt = NSAlert()
+        prompt.messageText = "Save Traktor’s analysis and continue?"
+        prompt.informativeText = "I’ll Quit Traktor avoids the macOS App Management permission. The app will wait and automatically check the saved track ID when Traktor closes."
+        prompt.alertStyle = .informational
+        prompt.addButton(withTitle: "I’ll Quit Traktor")
+        prompt.addButton(withTitle: "Close Automatically")
+        prompt.addButton(withTitle: "Cancel")
+        let choice = prompt.runModal()
+        guard choice != .alertThirdButtonReturn else { return }
+
+        state = .packaging
+        guard await closeTraktorOrWaitForUser(traktor, automatically: choice == .alertSecondButtonReturn) else { return }
+        statusText = "Checking Traktor’s saved track ID…"
+        let readiness = await recheckNativeReadinessAfterTraktorQuit(master: files[.master], collection: collectionURL)
+        state = report != nil && hasAllFiles ? .ready : .waiting
+        if readiness?.ready == true {
+            statusText = hasAllFiles
+                ? "Analyzed master found. All five files are ready for installation."
+                : "Analyzed master found. Add the remaining stems to continue."
+            recoveryText = hasAllFiles
+                ? "Choose Verify & Install Lossless Stems below."
+                : "Add the remaining four stem files individually or use Import Folder."
+        } else {
+            statusText = readiness?.message ?? "The saved Traktor track ID was not found."
+            recoveryText = "Open Traktor and confirm the exact master appears in the Track Collection and has finished analysis, then try again."
         }
     }
 
@@ -369,117 +402,18 @@ final class PackagerModel: ObservableObject {
                 if let error {
                     self.state = .failed("Traktor could not be opened: \(error.localizedDescription)")
                     self.statusText = "Traktor could not be opened."
-                    self.recoveryText = "Open Traktor manually, drag in this exact master, analyze it, then return and choose Check Traktor Again."
+                    self.recoveryText = "Open Traktor manually, drag in this exact master, analyze it, then return to this app."
                 } else {
-                    NSWorkspace.shared.activateFileViewerSelecting([master])
-                    self.statusText = "Traktor is open and your master is highlighted in Finder. Drag it into Traktor now."
-                    self.recoveryText = "Drop it into Traktor’s Track Collection or a deck. Let analysis finish, then return here and choose Check Traktor Again."
+                    self.statusText = "Your master is highlighted in Finder. Drag it into Traktor’s Track Collection now."
+                    self.recoveryText = "Let Traktor finish analyzing it. Then return here and choose Save, Quit Traktor & Continue—the app will take over from there."
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                        NSWorkspace.shared.activateFileViewerSelecting([master])
+                        NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder")
+                            .first?.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
+                    }
                 }
             }
         }
-    }
-
-    func beginAutomaticImportSetup() {
-        do {
-            try FileManager.default.createDirectory(at: automaticImportDirectory, withIntermediateDirectories: true)
-            automaticImportSetupInProgress = true
-            statusText = "Complete the one-time Automatic Import setup shown here."
-            recoveryText = "In Traktor: Preferences > File Management. Add the revealed folder under Music Folders, enable Analyze new imported tracks, and enable Import Music Folders at Startup. Then return here and choose Setup Complete — Import Master."
-            NSWorkspace.shared.activateFileViewerSelecting([automaticImportDirectory])
-            if let traktorURL = traktorApplicationURL() {
-                _ = NSWorkspace.shared.open(traktorURL)
-            }
-        } catch {
-            state = .failed("The Automatic Import folder could not be created.")
-            statusText = "The Automatic Import folder could not be created."
-            recoveryText = error.localizedDescription
-        }
-    }
-
-    func cancelAutomaticImportSetup() {
-        automaticImportSetupInProgress = false
-        statusText = "Choose Guided Drag or Automatic Import for this master."
-        recoveryText = nil
-    }
-
-    func completeAutomaticImportSetupAndImport() async {
-        UserDefaults.standard.set(true, forKey: "automaticTraktorImportConfigured")
-        automaticImportConfigured = true
-        automaticImportSetupInProgress = false
-        await importMasterAutomatically()
-    }
-
-    func importMasterAutomatically() async {
-        guard let master = files[.master] else {
-            statusText = "Add the stereo master first."
-            recoveryText = "Drop or choose the exact master file, then choose Automatic Import."
-            return
-        }
-        guard let traktorURL = traktorApplicationURL() else {
-            state = .failed("Traktor Pro 4 could not be found in Applications.")
-            statusText = "Traktor Pro 4 could not be found in Applications."
-            recoveryText = "Open Traktor manually and use Guided Drag, or move Traktor Pro 4.app into Applications or one of its subfolders."
-            return
-        }
-
-        do {
-            try FileManager.default.createDirectory(at: automaticImportDirectory, withIntermediateDirectories: true)
-            let importedMaster = try persistentAutomaticImportCopy(of: master)
-            files[.master] = importedMaster
-            if title.isEmpty { title = importedMaster.deletingPathExtension().lastPathComponent }
-            refreshNativeReadiness()
-
-            if let running = runningTraktorApplication() {
-                let prompt = NSAlert()
-                prompt.messageText = "Restart Traktor to import the master?"
-                prompt.informativeText = "Automatic Import runs when Traktor starts. Choose I’ll Quit Traktor to avoid the macOS App Management permission, or Close Automatically for convenience."
-                prompt.alertStyle = .informational
-                prompt.addButton(withTitle: "I’ll Quit Traktor")
-                prompt.addButton(withTitle: "Close Automatically")
-                prompt.addButton(withTitle: "Cancel")
-                let choice = prompt.runModal()
-                guard choice != .alertThirdButtonReturn else { return }
-                state = .packaging
-                let closed = await closeTraktorOrWaitForUser(running, automatically: choice == .alertSecondButtonReturn)
-                guard closed else { return }
-            }
-
-            statusText = "Starting Traktor. It will import and analyze the master from the configured Music Folder."
-            recoveryText = "Dismiss any Traktor startup or confirmation window. When analysis finishes, quit Traktor normally so it saves the track ID; this app will check it automatically. Keep the master in the Automatic Import folder—Traktor links to that copy."
-            guard NSWorkspace.shared.open(traktorURL) else {
-                throw NSError(
-                    domain: "TraktorStemPackager",
-                    code: 1,
-                    userInfo: [NSLocalizedDescriptionKey: "macOS could not launch Traktor Pro 4."]
-                )
-            }
-            refreshTraktorStatus()
-            state = report != nil && hasAllFiles ? .ready : .waiting
-        } catch {
-            state = .failed("The master could not be prepared for Automatic Import: \(error.localizedDescription)")
-            statusText = "The master could not be prepared for Automatic Import."
-            recoveryText = "Check that your Music folder is writable, then try again or use Guided Drag."
-        }
-    }
-
-    private func persistentAutomaticImportCopy(of source: URL) throws -> URL {
-        let manager = FileManager.default
-        let sourceURL = source.standardizedFileURL
-        let folderURL = automaticImportDirectory.standardizedFileURL
-        if sourceURL.deletingLastPathComponent() == folderURL { return sourceURL }
-
-        let base = sourceURL.deletingPathExtension().lastPathComponent
-        let ext = sourceURL.pathExtension
-        var destination = folderURL.appending(path: sourceURL.lastPathComponent)
-        var suffix = 2
-        while manager.fileExists(atPath: destination.path) {
-            if manager.contentsEqual(atPath: sourceURL.path, andPath: destination.path) { return destination }
-            let name = ext.isEmpty ? "\(base) \(suffix)" : "\(base) \(suffix).\(ext)"
-            destination = folderURL.appending(path: name)
-            suffix += 1
-        }
-        try manager.copyItem(at: sourceURL, to: destination)
-        return destination
     }
 
     func setArtwork(_ url: URL?) {
@@ -620,6 +554,21 @@ final class PackagerModel: ObservableObject {
         let shouldRelaunch = traktor != nil
         let traktorURL = traktor?.bundleURL
         let needsSavedAnalysisRefresh = nativeReadiness?.ready != true
+
+        if nativeReadiness?.linkedStemExists == true {
+            let replacement = NSAlert()
+            replacement.messageText = "Replace the existing linked stems?"
+            replacement.informativeText = "This master already has a linked Stem file. Replace Existing will install this set and keep the previous file as a timestamped .bak safety backup. The .bak file is not a second active Stem set."
+            replacement.alertStyle = .warning
+            replacement.addButton(withTitle: "Replace Existing")
+            replacement.addButton(withTitle: "Cancel")
+            guard replacement.runModal() == .alertFirstButtonReturn else {
+                statusText = "Installation cancelled. The existing linked stems were not changed."
+                recoveryText = nil
+                return
+            }
+        }
+
         let warning = NSAlert()
         warning.messageText = needsSavedAnalysisRefresh && traktor != nil
             ? "Save Traktor’s analysis and continue?"
@@ -684,7 +633,10 @@ final class PackagerModel: ObservableObject {
             let destination = URL(fileURLWithPath: result.destination)
             state = .complete(destination)
             statusText = "Installed and verified: all five decoded PCM streams match their sources exactly."
-            recoveryText = nil
+            recoveryText = result.stemBackup == nil
+                ? "Load the original master in Traktor; it should now open as a Stem Deck."
+                : "The existing linked Stem file was replaced. Its timestamped .bak file is a safety backup, not another active Stem set."
+            refreshNativeReadiness()
             if shouldRelaunch, let traktorURL {
                 _ = NSWorkspace.shared.open(traktorURL)
             }
@@ -703,13 +655,15 @@ final class PackagerModel: ObservableObject {
         guard let master else { return nil }
         for attempt in 0..<8 {
             do {
-                let result = try await EngineBridge().checkNativeReadiness(master: master, collection: collection)
+                let result = try await EngineBridge().checkNativeReadiness(
+                    master: master, collection: collection, stemsDirectory: stemsDirectoryURL
+                )
                 nativeReadiness = result
                 if result.ready { return result }
                 if attempt < 7 { try await Task.sleep(nanoseconds: 250_000_000) }
             } catch {
                 nativeReadiness = NativeReadiness(
-                    ready: false, found: false, hasAudioId: false,
+                    ready: false, found: false, hasAudioId: false, linkedStemExists: false,
                     message: error.localizedDescription
                 )
                 if attempt < 7 { try? await Task.sleep(nanoseconds: 250_000_000) }

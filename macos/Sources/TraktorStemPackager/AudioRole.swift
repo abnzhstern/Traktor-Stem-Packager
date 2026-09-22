@@ -73,5 +73,6 @@ struct NativeReadiness: Decodable {
     let ready: Bool
     let found: Bool
     let hasAudioId: Bool
+    let linkedStemExists: Bool
     let message: String
 }

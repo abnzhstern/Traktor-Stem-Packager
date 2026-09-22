@@ -91,34 +91,27 @@ struct ContentView: View {
                model.nativeReadiness?.ready == false,
                model.state != .packaging {
                 VStack(alignment: .trailing, spacing: 6) {
-                    if model.automaticImportSetupInProgress {
-                        Button("SETUP COMPLETE — IMPORT MASTER") {
-                            Task { await model.completeAutomaticImportSetupAndImport() }
-                        }
-                        .font(.system(size: 9, weight: .semibold))
-                        .buttonStyle(.borderedProminent)
-                        Button("CANCEL SETUP") { model.cancelAutomaticImportSetup() }
-                            .font(.system(size: 9, weight: .semibold))
-                            .buttonStyle(.bordered)
-                    } else {
-                        Button("GUIDED DRAG") { model.openTraktorAndRevealMaster() }
-                            .font(.system(size: 9, weight: .semibold))
-                            .buttonStyle(.borderedProminent)
-                        Button(model.automaticImportConfigured ? "AUTOMATIC IMPORT" : "SET UP AUTOMATIC IMPORT") {
-                            if model.automaticImportConfigured {
-                                Task { await model.importMasterAutomatically() }
+                    if model.traktorRunning {
+                        Button(model.canResolveUnsavedAnalysis ? "SAVE, QUIT TRAKTOR & INSTALL" : "SAVE & QUIT TRAKTOR") {
+                            if model.canResolveUnsavedAnalysis {
+                                Task { await model.create() }
                             } else {
-                                model.beginAutomaticImportSetup()
+                                Task { await model.saveAndQuitAfterAnalysis() }
                             }
                         }
                         .font(.system(size: 9, weight: .semibold))
-                        .buttonStyle(.bordered)
-                        Button("CHECK TRAKTOR AGAIN") {
-                            Task { await model.checkTraktorForMaster() }
-                        }
-                        .font(.system(size: 9, weight: .semibold))
-                        .buttonStyle(.plain)
+                        .buttonStyle(.borderedProminent)
+                        .tint(.orange)
+                    } else {
+                        Button("DRAG MASTER INTO TRAKTOR") { model.openTraktorAndRevealMaster() }
+                            .font(.system(size: 9, weight: .semibold))
+                            .buttonStyle(.borderedProminent)
                     }
+                    Button("CHECK TRAKTOR AGAIN") {
+                        Task { await model.checkTraktorForMaster() }
+                    }
+                    .font(.system(size: 9, weight: .semibold))
+                    .buttonStyle(.bordered)
                 }
             }
         }
@@ -153,7 +146,7 @@ struct ContentView: View {
         }
 
         if model.files[.master] == nil {
-            return ("STEP 1", "Add the exact stereo master here first. You can add the other stems now or later.", "1.circle.fill", .blue)
+            return ("STEP 1", "Add the stereo master in the Master slot below, add all five files individually, or use Import Folder.", "1.circle.fill", .blue)
         }
         if model.collectionURL == nil || model.stemsDirectoryURL == nil {
             return ("STEP 2", "Confirm the Traktor Collection and Stems folder locations below.", "2.circle.fill", .blue)
@@ -162,18 +155,17 @@ struct ContentView: View {
             return ("CHECKING TRAKTOR", "Checking the master against Traktor’s saved collection…", "magnifyingglass.circle.fill", .blue)
         }
         if model.nativeReadiness?.ready == false {
-            if model.automaticImportSetupInProgress {
-                return ("ONE-TIME SETUP", "In Traktor Preferences > File Management, add the revealed folder under Music Folders. Enable Analyze new imported tracks and Import Music Folders at Startup. Then return here and choose Setup Complete — Import Master.", "gearshape.fill", .orange)
-            }
             if model.traktorRunning {
-                return ("STEP 3", "If the master is already in Traktor, let analysis finish. Then check again; if it is still not found, quit Traktor normally so it saves the collection.", "3.circle.fill", .orange)
+                return ("NEXT ACTION", model.canResolveUnsavedAnalysis
+                    ? "After Traktor finishes analyzing the master, choose Save, Quit Traktor & Install. The app will wait, verify the saved track ID and install automatically."
+                    : "After Traktor finishes analyzing the master, choose Save & Quit Traktor. The app will wait and verify the saved track ID automatically.", "arrow.right.circle.fill", .orange)
             }
-            return ("STEP 3", "This exact master is not in Traktor yet. Use Guided Drag for the most reliable one-time import, or set up Automatic Import for repeated use.", "3.circle.fill", .blue)
+            return ("STEP 3", "This exact master is not in Traktor yet. Choose Drag Master into Traktor; Finder will bring the correct file to the foreground.", "3.circle.fill", .blue)
         }
         if !model.hasAllFiles {
             return ("STEP 4", "The analyzed master was found. Add the remaining four stems or import their five-file folder.", "4.circle.fill", .blue)
         }
-        return ("READY TO INSTALL", "The master is linked and all five files are accepted. Choose Verify & Install Lossless Stems.", "checkmark.circle.fill", .green)
+        return ("READY TO INSTALL", "The analyzed master and all five files are ready. Choose Verify & Install Lossless Stems below.", "checkmark.circle.fill", .green)
     }
 
     private var workflowGuide: some View {
@@ -215,7 +207,7 @@ struct ContentView: View {
             guideRow(
                 icon: "waveform.badge.checkmark",
                 title: "Lossless Traktor Installation",
-                detail: "Add the exact stereo master. The app checks Traktor first and skips importing if it is already analyzed. Otherwise use reliable Guided Drag, or complete the clearly marked one-time setup for Automatic Import."
+                detail: "Add the exact stereo master. The app checks Traktor first and skips importing if it is already analyzed. Otherwise choose Drag Master into Traktor, analyze it, then follow the highlighted Save, Quit Traktor & Install action."
             )
 
             Text("Important: use the same master file in both Traktor and this app. A different copy may create a separate library entry and will not inherit the original track’s cues or beat grid.")
@@ -372,7 +364,7 @@ struct ContentView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("v0.6.0-beta.9")
+                Text("v0.6.0-beta.10")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.62))
                 Text("AAC + VERIFIED LOSSLESS")
@@ -499,7 +491,7 @@ struct ContentView: View {
             }
             .padding(.horizontal, 2)
 
-            ForEach([AudioRole.drums, .bass, .other, .vocals, .master]) { role in
+            ForEach([AudioRole.master, .drums, .bass, .other, .vocals]) { role in
                 FileDropRow(
                     role: role,
                     displayName: stemNameBinding(role),

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
-import { inspectCollectionEntry } from './native-link.mjs';
+import { access, readFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { inspectCollectionEntry, nativeStemRelativePath } from './native-link.mjs';
 
 function parseArgs(argv) {
   const options = {};
@@ -18,10 +18,16 @@ async function main() {
   if (!args.master || !args.collection) throw new Error('Master and collection paths are required.');
   const collection = await readFile(resolve(args.collection), 'utf8');
   const result = inspectCollectionEntry(collection, resolve(args.master));
+  let linkedStemExists = false;
+  if (result.ready && args['stems-dir']) {
+    const destination = join(resolve(args['stems-dir']), nativeStemRelativePath(result.entry.audioId));
+    linkedStemExists = await access(destination).then(() => true).catch(() => false);
+  }
   console.log(`NATIVE_READINESS_RESULT ${JSON.stringify({
     ready: result.ready,
     found: result.found,
     hasAudioId: result.hasAudioId,
+    linkedStemExists,
     message: result.message,
   })}`);
 }
