@@ -59,10 +59,8 @@ LOSSLESS TRAKTOR HANDOFF
 
 The lossless workflow checks Traktor's collection first. If the exact master is already analyzed, the import step is skipped.
 
-If it is not present, choose Drag Master into Traktor. The app opens Traktor and brings Finder to the foreground with the exact master highlighted. Drag it into Traktor's Track Collection and let analysis finish. Return to the app and choose Save, Quit Traktor & Install; the app waits for Traktor to save, verifies the track ID, and installs the lossless stems.
+If it is not present, choose Drag Stereo Master into Traktor. The app opens Traktor and brings Finder to the foreground with the exact master highlighted. Drag it into Traktor's Track Collection, not onto a deck, and let analysis finish. A Show Master in Finder button remains available if you need to reveal it again. Return to the app and choose Save, Quit Traktor & Install.
 
 If linked stems already exist for that master, the app asks before replacing them. A timestamped .bak file is a safety backup of the previous linked Stem file, not a second active Stem set.
 
-Traktor must close before the app edits collection.nml. At that step you can choose:
-• I’ll Quit Traktor — avoids the macOS App Management permission. Quit Traktor normally and the app will detect it and continue automatically.
-• Close Automatically — the app asks Traktor to quit and reopen. macOS may ask for App Management permission. If permission is denied, quit Traktor normally; the app will keep waiting and continue without restarting.
+Traktor must close before the app edits collection.nml. Quit Traktor normally when prompted. The app detects the closure and continues automatically without requesting permission to close another app. Traktor may briefly say Updating Settings while saving its collection; that is expected.

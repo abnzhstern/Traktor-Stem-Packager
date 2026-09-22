@@ -102,8 +102,11 @@ struct ContentView: View {
                         .font(.system(size: 9, weight: .semibold))
                         .buttonStyle(.borderedProminent)
                         .tint(.orange)
+                        Button("SHOW MASTER IN FINDER") { model.revealMasterInFinder() }
+                            .font(.system(size: 9, weight: .semibold))
+                            .buttonStyle(.bordered)
                     } else {
-                        Button("DRAG MASTER INTO TRAKTOR") { model.openTraktorAndRevealMaster() }
+                        Button("DRAG STEREO MASTER INTO TRAKTOR") { model.openTraktorAndRevealMaster() }
                             .font(.system(size: 9, weight: .semibold))
                             .buttonStyle(.borderedProminent)
                     }
@@ -157,10 +160,10 @@ struct ContentView: View {
         if model.nativeReadiness?.ready == false {
             if model.traktorRunning {
                 return ("NEXT ACTION", model.canResolveUnsavedAnalysis
-                    ? "After Traktor finishes analyzing the master, choose Save, Quit Traktor & Install. The app will wait, verify the saved track ID and install automatically."
-                    : "After Traktor finishes analyzing the master, choose Save & Quit Traktor. The app will wait and verify the saved track ID automatically.", "arrow.right.circle.fill", .orange)
+                    ? "Let Traktor finish analyzing the stereo master. Then choose Save, Quit Traktor & Install. Traktor may briefly say Updating Settings while it saves; that is normal."
+                    : "Let Traktor finish analyzing the stereo master. Then choose Save & Quit Traktor. Traktor may briefly say Updating Settings while it saves; that is normal.", "arrow.right.circle.fill", .orange)
             }
-            return ("STEP 3", "This exact master is not in Traktor yet. Choose Drag Master into Traktor; Finder will bring the correct file to the foreground.", "3.circle.fill", .blue)
+            return ("STEP 3", "Before lossless stems can be installed, the exact stereo master must be analyzed. Choose Drag Stereo Master into Traktor, then drop it into the Track Collection—not onto a deck.", "3.circle.fill", .blue)
         }
         if !model.hasAllFiles {
             return ("STEP 4", "The analyzed master was found. Add the remaining four stems or import their five-file folder.", "4.circle.fill", .blue)
@@ -186,7 +189,7 @@ struct ContentView: View {
             }
 
             VStack(alignment: .leading, spacing: 5) {
-                Text("THIS APP PACKAGES EXISTING STEMS")
+                Text("THIS APP PACKAGES EXISTING STEMS FOR TRAKTOR")
                     .font(.system(size: 11, weight: .bold))
                     .tracking(0.6)
                 Text("It does not separate a finished song or create stems. Use four stems you created yourself or received from a producer, composer, label, or stem-separation service, plus the matching stereo master. Add them individually or use Import Folder to auto-assign a five-file folder for review.")
@@ -207,7 +210,7 @@ struct ContentView: View {
             guideRow(
                 icon: "waveform.badge.checkmark",
                 title: "Lossless Traktor Installation",
-                detail: "Add the exact stereo master. The app checks Traktor first and skips importing if it is already analyzed. Otherwise choose Drag Master into Traktor, analyze it, then follow the highlighted Save, Quit Traktor & Install action."
+                detail: "The exact stereo master must be in Traktor and analyzed before lossless stems can be installed. Add it here first so the app can check. If it is already analyzed, that step is skipped. Otherwise drag the highlighted master into Traktor’s Track Collection—not onto a deck—so Traktor adds and analyzes it. You may add the four stems before or after this step."
             )
 
             Text("Important: use the same master file in both Traktor and this app. A different copy may create a separate library entry and will not inherit the original track’s cues or beat grid.")
@@ -364,7 +367,7 @@ struct ContentView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("v0.6.0-beta.10")
+                Text("v0.6.0-beta.11")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.62))
                 Text("AAC + VERIFIED LOSSLESS")
@@ -573,12 +576,14 @@ struct ContentView: View {
             if case .complete = model.state {
                 Button("SHOW IN FINDER") { model.revealOutput() }
             }
-            Button(model.primaryActionTitle) {
-                Task { await model.create() }
+            if model.mode == .portableAAC || model.nativeReadiness?.ready == true {
+                Button(model.primaryActionTitle) {
+                    Task { await model.create() }
+                }
+                    .buttonStyle(.borderedProminent)
+                    .tint(model.mode == .nativeLossless && model.canCreate ? .orange : Color(red: 0.32, green: 0.34, blue: 0.37))
+                    .disabled(!(model.canCreate || model.canResolveUnsavedAnalysis))
             }
-                .buttonStyle(.borderedProminent)
-                .tint(Color(red: 0.32, green: 0.34, blue: 0.37))
-                .disabled(!(model.canCreate || model.canResolveUnsavedAnalysis))
         }
         .padding(.horizontal, 16)
         .frame(minHeight: 58)

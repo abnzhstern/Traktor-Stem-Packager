@@ -6,22 +6,23 @@ This app does not create or separate stems. Start with four stems you already
 created or received, plus the matching stereo master.
 
 Before testing:
-1. Confirm the app title bar says v0.6.0-beta.10, then select
+1. Confirm the app title bar says v0.6.0-beta.11, then select
    “Lossless Traktor Installation.”
 2. Choose the collection.nml used by that Traktor installation.
 3. Choose the Stems folder configured in Traktor Pro 4 Preferences.
 4. Add the original master in the Master slot, add all five files, or use Import
    Folder. The app checks Traktor first. If the master is already analyzed,
-   import is skipped. Otherwise choose DRAG MASTER INTO TRAKTOR. Finder brings
-   the exact file forward. Drag it into Traktor and let analysis finish, then
+   import is skipped. Otherwise choose DRAG STEREO MASTER INTO TRAKTOR. Finder
+   brings the exact file forward. Drag it into Traktor's Track Collection, not
+   onto a deck, and let analysis finish, then
    return and choose SAVE, QUIT TRAKTOR & INSTALL.
 5. Add the four matching stems. This test build accepts
    uncompressed PCM WAV/AIFF at 16-bit/44.1 kHz or 24-bit/48 kHz.
    You can also choose IMPORT FOLDER, review the proposed assignments, drag
    files between slots to correct them, and choose ACCEPT ASSIGNMENTS.
-6. Click VERIFY & INSTALL LOSSLESS STEMS. If Traktor is open, choose I’LL QUIT
-   TRAKTOR to avoid the macOS App Management permission, or CLOSE AUTOMATICALLY
-   for the convenience of an automatic handoff.
+6. Click VERIFY & INSTALL LOSSLESS STEMS. If Traktor is open, continue and quit
+   Traktor normally. The app waits and resumes automatically without requesting
+   permission to close another app.
 7. In Traktor, load the ORIGINAL master track. Do not import the hashed .stem.mp4 directly.
 
 The app creates a timestamped backup of collection.nml before changing it. If a
@@ -31,9 +32,9 @@ Before installing, it decodes all five packaged ALAC streams and requires their
 PCM SHA-256 hashes to match the five source files exactly.
 
 If Traktor is still open after analyzing the master, the analysis may not yet
-be written to collection.nml. Choose SAVE, CLOSE TRAKTOR & CONTINUE. If macOS
-blocks automatic closing, quit Traktor normally. The app will detect the closure,
-recheck the track ID, install, and reopen Traktor without restarting the process.
+be written to collection.nml. Choose SAVE, QUIT TRAKTOR & INSTALL, continue,
+then quit Traktor normally. The app will detect the closure, recheck the track
+ID, install, and reopen Traktor without restarting the process.
 
 For this test, confirm:
 • The linked-stems icon appears beside the original track.

@@ -24,7 +24,7 @@ The current build supports **Apple Silicon Macs** running **macOS 14 or newer**.
 - Decodes and SHA-256 verifies every packaged lossless stream against its source before installation
 - Can ask Traktor to save and quit normally before installation, then relaunch it afterward
 - Sends the exact selected master to Traktor, checks for its saved analysis ID, and always states the next required action
-- Offers either a manual Traktor quit that avoids App Management permission or an automatic close with a seamless manual fallback
+- Waits for the user to quit Traktor normally, avoiding App Management permission prompts
 - Preserves the existing Traktor library entry so its cues, beat grid, loops, and other track data remain attached
 - Provides Clear All, drag-and-drop reassignment, accepted-assignment locking, and Edit Assignments
 - Opens with a workflow guide explaining what the app does and walking through the selected workflow; users can choose **Don't Show Again** and reopen it later with **How It Works**
@@ -75,7 +75,7 @@ macos/scripts/build-app.sh
 
 The completed app is written to `macos/build/Traktor Stem Packager.app`.
 
-The AAC Stem File workflow is the shareable standalone `.stem.mp4` option. Lossless ALAC is an experimental linked mode: Traktor must analyze the exact original master, and the app creates a timestamped collection backup before making the link. The app can send the master to Traktor and verify the saved ID. If Traktor is open at installation time, the user may quit it manually to avoid App Management permission or allow the app to request a normal save-and-quit before relaunching it.
+The AAC Stem File workflow is the shareable standalone `.stem.mp4` option. Lossless ALAC is an experimental linked mode: Traktor must analyze the exact original master, and the app creates a timestamped collection backup before making the link. The app reveals the master for import into Traktor's Track Collection and verifies the saved ID. If Traktor is open at installation time, the app asks the user to quit it normally, waits for the saved collection, and continues automatically.
 
 The command-line packaging engine can also be run directly:
 
