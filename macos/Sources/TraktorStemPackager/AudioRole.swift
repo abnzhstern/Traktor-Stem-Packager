@@ -8,13 +8,13 @@ enum PackagingMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .portableAAC: "Portable Stem File"
+        case .portableAAC: "AAC Stem File"
         case .nativeLossless: "Lossless Traktor Installation"
         }
     }
     var subtitle: String {
         switch self {
-        case .portableAAC: "One shareable .stem.mp4 file • AAC 320 kbps"
+        case .portableAAC: "One shareable file • easiest workflow • 320 kbps AAC"
         case .nativeLossless: "Preserves source PCM • Installs directly into Traktor"
         }
     }
@@ -26,7 +26,7 @@ enum PackagingMode: String, CaseIterable, Identifiable {
     }
 }
 
-enum AudioRole: String, CaseIterable, Identifiable {
+enum AudioRole: String, CaseIterable, Identifiable, Hashable {
     case master = "Master"
     case drums = "Drums"
     case bass = "Bass"

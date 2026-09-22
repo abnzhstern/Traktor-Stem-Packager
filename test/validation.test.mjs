@@ -17,6 +17,19 @@ test('rejects a sample-rate mismatch', () => {
   );
 });
 
+test('explains file problems in plain language', () => {
+  const wrong = { ...base, sampleRate: 44100, channels: 1, duration: 178.5 };
+  assert.throws(
+    () => validateSet({ master: base, drums: wrong, bass: base, other: base, vocals: base }),
+    (error) => {
+      assert.match(error.message, /Drums is 44\.1 kHz/);
+      assert.match(error.message, /Drums is mono/);
+      assert.match(error.message, /same start and end points/);
+      return true;
+    },
+  );
+});
+
 test('rejects 192 kHz until a compatible lossless mode is available', () => {
   const highRate = { ...base, sampleRate: 192000 };
   assert.throws(

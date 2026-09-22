@@ -37,20 +37,23 @@ export function validateSet(tracks, toleranceSeconds = 0.001) {
 
   const [referenceName, reference] = entries[0];
   const problems = [];
+  const label = (name) => name.charAt(0).toUpperCase() + name.slice(1);
+  const rate = (value) => `${value / 1000} kHz`;
 
   for (const [name, track] of entries) {
     if (track.sampleRate !== reference.sampleRate) {
-      problems.push(`${name}: ${track.sampleRate} Hz does not match ${referenceName}: ${reference.sampleRate} Hz`);
+      problems.push(`${label(name)} is ${rate(track.sampleRate)} and does not match ${label(referenceName)} at ${rate(reference.sampleRate)}. Replace it with a ${rate(reference.sampleRate)} file.`);
     }
-    if (track.channels !== reference.channels) {
-      problems.push(`${name}: ${track.channels} channels does not match ${referenceName}: ${reference.channels}`);
+    if (track.channels !== 2) {
+      const layout = track.channels === 1 ? 'mono' : `${track.channels}-channel audio`;
+      problems.push(`${label(name)} is ${layout}. Traktor requires every input to be stereo.`);
     }
     if (Math.abs(track.duration - reference.duration) > toleranceSeconds) {
-      problems.push(`${name}: duration ${track.duration.toFixed(6)}s does not match ${referenceName}: ${reference.duration.toFixed(6)}s`);
+      const difference = Math.abs(track.duration - reference.duration);
+      problems.push(`${label(name)} does not match ${label(referenceName)} in length (${difference.toFixed(3)} seconds different). Export all five files from the same start and end points.`);
     }
   }
 
-  if (reference.channels !== 2) problems.push('Traktor Stem inputs must be stereo.');
   const supportedSampleRates = new Set([44100, 48000, 88200, 96000]);
   if (!supportedSampleRates.has(reference.sampleRate)) {
     problems.push(

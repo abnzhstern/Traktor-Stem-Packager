@@ -31,7 +31,9 @@ final class PackagerModel: ObservableObject {
     @Published var report: ValidationReport?
     @Published var nativeReadiness: NativeReadiness?
     @Published var traktorRunning = false
-    @Published var statusText = "Add the master and four matching stereo stems."
+    @Published var statusText = "Add your master and four stem files, or import a five-file folder."
+    @Published var validationProblemRoles: Set<AudioRole> = []
+    @Published var folderImportNeedsReview = false
     private var extractedArtworkURL: URL?
     private var readinessTask: Task<Void, Never>?
 
@@ -57,6 +59,7 @@ final class PackagerModel: ObservableObject {
     }
 
     var hasAllFiles: Bool { AudioRole.allCases.allSatisfy { files[$0] != nil } }
+    var audioSetValidated: Bool { state == .ready && hasAllFiles }
     var canCreate: Bool {
         state == .ready && hasAllFiles &&
             (mode == .portableAAC || (collectionURL != nil && stemsDirectoryURL != nil && nativeReadiness?.ready == true))
@@ -69,7 +72,7 @@ final class PackagerModel: ObservableObject {
     }
 
     var primaryActionTitle: String {
-        if mode == .portableAAC { return "CREATE PORTABLE STEM FILE" }
+        if mode == .portableAAC { return "CREATE AAC STEM FILE" }
         if canResolveUnsavedAnalysis { return "SAVE, CLOSE TRAKTOR & CONTINUE" }
         return "VERIFY & INSTALL LOSSLESS STEMS"
     }
@@ -77,30 +80,117 @@ final class PackagerModel: ObservableObject {
     func setMode(_ newMode: PackagingMode) {
         mode = newMode
         report = nil
+        validationProblemRoles = []
         state = .waiting
-        statusText = hasAllFiles ? "Checking compatibility…" : "Add the remaining audio files."
+        statusText = hasAllFiles ? "Checking compatibility…" : "Add your master and four stem files, or import a five-file folder."
         refreshNativeReadiness()
-        if hasAllFiles { Task { await validate() } }
+        if hasAllFiles && !folderImportNeedsReview { Task { await validate() } }
     }
 
     func setFile(_ url: URL, for role: AudioRole) {
-        files[role] = url
+        let previousMaster = files[.master]
+        if let sourceRole = files.first(where: { $0.value.standardizedFileURL == url.standardizedFileURL })?.key,
+           sourceRole != role {
+            let displaced = files[role]
+            files[role] = url
+            files[sourceRole] = displaced
+        } else {
+            files[role] = url
+        }
         report = nil
+        validationProblemRoles = []
         state = .waiting
-        statusText = hasAllFiles ? "Checking compatibility…" : "Add the remaining audio files."
-        if role == .master {
-            title = url.deletingPathExtension().lastPathComponent
-            Task { await loadMasterMetadata(from: url) }
+        statusText = folderImportNeedsReview
+            ? "Review the folder assignments. Drag files between rows to swap them, then confirm."
+            : hasAllFiles ? "Checking compatibility…" : "Add your master and four stem files, or import a five-file folder."
+        if files[.master] != previousMaster, let master = files[.master] {
+            title = master.deletingPathExtension().lastPathComponent
+            Task { await loadMasterMetadata(from: master) }
             refreshNativeReadiness()
         }
-        if hasAllFiles { Task { await validate() } }
+        if hasAllFiles && !folderImportNeedsReview { Task { await validate() } }
+    }
+
+    func importFolder(_ directory: URL) {
+        let supported = Set(["wav", "wave", "aif", "aiff", "m4a", "aac", "mp3"])
+        do {
+            let audioFiles = try FileManager.default.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            )
+                .filter { supported.contains($0.pathExtension.lowercased()) }
+                .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+
+            guard audioFiles.count == 5 else {
+                folderImportNeedsReview = false
+                validationProblemRoles = []
+                state = .failed("This folder contains \(audioFiles.count) supported audio files. Choose a folder containing exactly one master and four stems, or add the files manually.")
+                statusText = "This folder contains \(audioFiles.count) supported audio files. Choose a folder containing exactly one master and four stems, or add the files manually."
+                return
+            }
+
+            var assignments: [AudioRole: URL] = [:]
+            var unassigned: [URL] = []
+            for file in audioFiles {
+                if let role = suggestedRole(for: file), assignments[role] == nil {
+                    assignments[role] = file
+                } else {
+                    unassigned.append(file)
+                }
+            }
+            for role in AudioRole.allCases where assignments[role] == nil {
+                if let next = unassigned.first {
+                    assignments[role] = next
+                    unassigned.removeFirst()
+                }
+            }
+
+            files = assignments
+            report = nil
+            validationProblemRoles = []
+            folderImportNeedsReview = true
+            state = .waiting
+            statusText = "Review the folder assignments. Drag files between rows to swap them, then confirm."
+            if let master = files[.master] {
+                title = master.deletingPathExtension().lastPathComponent
+                Task { await loadMasterMetadata(from: master) }
+            }
+            refreshNativeReadiness()
+        } catch {
+            folderImportNeedsReview = false
+            state = .failed("The folder could not be read. Choose it again or add the files manually.")
+            statusText = "The folder could not be read. Choose it again or add the files manually."
+        }
+    }
+
+    func confirmFolderAssignments() {
+        guard folderImportNeedsReview, hasAllFiles else { return }
+        folderImportNeedsReview = false
+        statusText = "Checking compatibility…"
+        Task { await validate() }
+    }
+
+    private func suggestedRole(for file: URL) -> AudioRole? {
+        let base = file.deletingPathExtension().lastPathComponent.lowercased()
+        let tokens = base.split { !$0.isLetter && !$0.isNumber }.map(String.init)
+        let boundaryTokens = Set([tokens.first, tokens.last].compactMap { $0 })
+        if !boundaryTokens.isDisjoint(with: ["drum", "drums", "percussion"]) { return .drums }
+        if boundaryTokens.contains("bass") { return .bass }
+        if !boundaryTokens.isDisjoint(with: ["vocal", "vocals", "vox", "acapella", "acappella"]) { return .vocals }
+        if !boundaryTokens.isDisjoint(with: ["other", "music", "instrumental", "instruments"]) { return .other }
+        if boundaryTokens.contains("master") || base.contains("full mix") || base.contains("mixdown") || base.contains("stereo mix") {
+            return .master
+        }
+        return nil
     }
 
     func clear(_ role: AudioRole) {
         files[role] = nil
         report = nil
+        validationProblemRoles = []
         state = .waiting
-        statusText = "Add the remaining audio files."
+        statusText = "Add your master and four stem files, or import a five-file folder."
         if role == .master {
             title = ""
             artist = ""
@@ -197,14 +287,26 @@ final class PackagerModel: ObservableObject {
             let bridge = try EngineBridge()
             let result = try await bridge.validate(files: files, mode: mode)
             report = result
+            validationProblemRoles = []
             state = .ready
             statusText = result.limiterEnabled
                 ? String(format: "Compatible. Peak protection enabled: combined peak %.1f dBFS; ceiling −0.3 dBFS.", result.stemSumTruePeakDbfs)
                 : String(format: "Compatible. Protection not needed: combined peak %.1f dBFS.", result.stemSumTruePeakDbfs)
         } catch {
+            validationProblemRoles = problemRoles(from: error.localizedDescription)
             state = .failed(error.localizedDescription)
             statusText = error.localizedDescription
         }
+    }
+
+    private func problemRoles(from message: String) -> Set<AudioRole> {
+        let lowercased = message.lowercased()
+        let matched = AudioRole.allCases.filter { role in
+            guard let url = files[role] else { return false }
+            return lowercased.contains(role.commandName.lowercased()) ||
+                lowercased.contains(url.path.lowercased())
+        }
+        return matched.isEmpty ? Set(AudioRole.allCases) : Set(matched)
     }
 
     func create() async {
@@ -262,10 +364,10 @@ final class PackagerModel: ObservableObject {
             ? "Verify and install lossless stems?"
             : "Close Traktor and install lossless stems?"
         warning.informativeText = needsSavedAnalysisRefresh && traktor != nil
-            ? "Traktor appears to have analyzed the master without saving its new track ID to collection.nml. The app will ask Traktor to quit normally, recheck the saved analysis, install the linked stems, then reopen Traktor."
+            ? "Traktor appears to have analyzed the master without saving its new track ID to collection.nml. The app will ask Traktor to quit normally, recheck the saved analysis, install the linked stems, then reopen Traktor. If macOS requests permission for this Traktor handoff, choose Allow."
             : traktor == nil
             ? "The app will verify all five decoded PCM streams, back up collection.nml, install the lossless sidecar, and link it to the exact master track."
-            : "The app will ask Traktor to quit normally so it can save the collection, verify all five decoded PCM streams, install the linked stems, then reopen Traktor."
+            : "The app will ask Traktor to quit normally so it can save the collection, verify all five decoded PCM streams, install the linked stems, then reopen Traktor. If macOS requests permission for this Traktor handoff, choose Allow."
         warning.alertStyle = .warning
         warning.addButton(withTitle: needsSavedAnalysisRefresh && traktor != nil
             ? "Save, Close & Continue"

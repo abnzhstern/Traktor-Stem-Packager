@@ -196,12 +196,34 @@ struct EngineBridge {
                 if completed.terminationStatus == 0 {
                     continuation.resume(returning: text)
                 } else {
-                    continuation.resume(throwing: EngineError.failed(text.isEmpty ? "Packaging failed." : text))
+                    continuation.resume(throwing: EngineError.failed(Self.failureMessage(from: text)))
                 }
             }
             do { try process.run() }
             catch { continuation.resume(throwing: error) }
         }
+    }
+
+    private static func failureMessage(from output: String) -> String {
+        guard !output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return "Packaging failed. Check the selected files and try again."
+        }
+        let lines = output.components(separatedBy: .newlines)
+        if let start = lines.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces).hasPrefix("Error:") }) {
+            var useful: [String] = []
+            for line in lines[start...] {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if trimmed.hasPrefix("at ") || trimmed.hasPrefix("Node.js ") { break }
+                if useful.isEmpty {
+                    useful.append(trimmed.replacingOccurrences(of: "Error:", with: "", options: .anchored).trimmingCharacters(in: .whitespaces))
+                } else if !trimmed.isEmpty {
+                    useful.append(trimmed)
+                }
+            }
+            let message = useful.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !message.isEmpty { return message }
+        }
+        return output.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 

@@ -2,16 +2,21 @@ TRAKTOR STEM PACKAGER — LOSSLESS LINKED TEST
 
 This is an experimental test build. Do not share it publicly yet.
 
+This app does not create or separate stems. Start with four stems you already
+created or received, plus the matching stereo master.
+
 Before testing:
 1. Import the original stereo master into Traktor Pro 4 and analyze it.
 2. Leave Traktor open or close it. If it is open, the app will ask it to save and
    quit normally before installation, then reopen it afterward.
-3. Confirm the app title bar says v0.6.0-beta.5, then select
+3. Confirm the app title bar says v0.6.0-beta.6, then select
    “Lossless Traktor Installation.”
 4. Choose the collection.nml used by that Traktor installation.
 5. Choose the Stems folder configured in Traktor Pro 4 Preferences.
 6. Add the original master plus four matching stems. This test build accepts
    uncompressed PCM WAV/AIFF at 16-bit/44.1 kHz or 24-bit/48 kHz.
+   You can also choose IMPORT FOLDER, review the proposed assignments, drag
+   files between rows to correct them, and choose CONFIRM ASSIGNMENTS.
 7. Click VERIFY & INSTALL LOSSLESS STEMS and accept the warning.
 8. In Traktor, load the ORIGINAL master track. Do not import the hashed .stem.mp4 directly.
 

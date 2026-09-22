@@ -5,6 +5,8 @@ struct FileDropRow: View {
     let role: AudioRole
     @Binding var displayName: String
     let url: URL?
+    let isValidated: Bool
+    let hasProblem: Bool
     let select: (URL) -> Void
     let clear: () -> Void
 
@@ -33,7 +35,7 @@ struct FileDropRow: View {
             } label: {
                 HStack {
                     Image(systemName: url == nil ? "plus.circle" : "checkmark.circle.fill")
-                        .foregroundStyle(url == nil ? Color.white.opacity(0.45) : role.color)
+                        .foregroundStyle(indicatorColor)
                     Text(url?.lastPathComponent ?? "Drop audio file or click to choose")
                         .lineLimit(1)
                         .foregroundStyle(url == nil ? Color.white.opacity(0.48) : Color.white.opacity(0.88))
@@ -46,8 +48,8 @@ struct FileDropRow: View {
                 }
                 .padding(.horizontal, 12)
                 .frame(maxWidth: .infinity, minHeight: 42)
-                .background(targeted ? role.color.opacity(0.18) : Color.white.opacity(0.055))
-                .overlay(Rectangle().stroke(targeted ? role.color : Color.white.opacity(0.09), lineWidth: 1))
+                .background(rowBackground)
+                .overlay(Rectangle().stroke(rowBorder, lineWidth: hasProblem || url == nil ? 1.5 : 1))
             }
             .buttonStyle(.plain)
             .fileImporter(isPresented: $importing, allowedContentTypes: [.audio], allowsMultipleSelection: false) { result in
@@ -60,6 +62,33 @@ struct FileDropRow: View {
                 }
                 return true
             }
+            .onDrag {
+                guard let url else { return NSItemProvider() }
+                return NSItemProvider(object: url as NSURL)
+            }
         }
+    }
+
+    private var indicatorColor: Color {
+        if hasProblem { return .red }
+        if isValidated { return .green }
+        if url == nil { return role.color.opacity(0.9) }
+        return Color.white.opacity(0.55)
+    }
+
+    private var rowBackground: Color {
+        if targeted { return role.color.opacity(0.18) }
+        if hasProblem { return Color.red.opacity(0.10) }
+        if isValidated { return Color.green.opacity(0.06) }
+        if url == nil { return role.color.opacity(0.055) }
+        return Color.white.opacity(0.055)
+    }
+
+    private var rowBorder: Color {
+        if targeted { return role.color }
+        if hasProblem { return .red }
+        if isValidated { return Color.green.opacity(0.55) }
+        if url == nil { return role.color.opacity(0.55) }
+        return Color.white.opacity(0.09)
     }
 }

@@ -2,6 +2,12 @@ TRAKTOR STEM PACKAGER — MAC INSTALLATION
 
 This build is not Apple-notarized. Installation may require one brief Terminal step, depending on your Mac's security settings. Terminal is not needed for normal use after installation.
 
+WHAT THIS APP IS
+
+Traktor Stem Packager does not create or separate stems like NuoStems. It packages four stems you already created or received from a producer, composer, label, or stem-separation service, together with the matching stereo master.
+
+Files can be added individually, or Import Folder can propose assignments from a folder containing exactly five supported audio files. Always review the proposed assignments before confirming them; drag a file onto another row to swap the two.
+
 IMPORTANT
 Keep these two items together in this folder:
 • Install Traktor Stem Packager.command
@@ -13,6 +19,8 @@ METHOD 1 — TRY THIS FIRST
 2. Choose Open.
 3. If macOS asks whether you are sure, choose Open again.
 4. The installer will place the app in Applications and launch it.
+
+If macOS says Terminal needs permission to modify apps, choose Allow. That permission is used only to place or replace Traktor Stem Packager in the Applications folder.
 
 If an older version is already installed, you do not need to delete it first. The installer closes it, installs the new version in the same Applications location, and moves the previous copy to the Trash as a recoverable backup.
 

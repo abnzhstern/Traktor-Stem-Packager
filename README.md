@@ -2,6 +2,8 @@
 
 A free, open-source macOS utility that packages a stereo master and four matching stems into a Native Instruments-compatible `.stem.mp4` file for Traktor Pro 4.
 
+> **This is a stem packager, not a stem creator.** It does not separate a finished song into stems like NuoStems. It packages four stems you already created or received from a producer, composer, label, or stem-separation service, together with the matching stereo master.
+
 ![Traktor Stem Packager icon](macos/Resources/AppIcon-1024.png)
 
 ## Download
@@ -12,16 +14,18 @@ The current build supports **Apple Silicon Macs** running **macOS 14 or newer**.
 
 ## What it does
 
-- Accepts a stereo master plus Drums, Bass, Other, and Vocals stems
+- Accepts a stereo master plus four existing stems; the default Drums, Bass, Other, and Vocals display names can be edited
+- Optionally imports a folder containing exactly five audio files, proposes the Master and stem assignments from their filenames, and lets users drag files between rows before confirming
 - Validates sample rate, channel count, duration, and synchronization-critical properties
 - Reads title, artist, album, release date, producer, label, genre, and artwork from the stereo master
 - Lets you edit metadata and stem display names before packaging
-- Portable mode encodes five Apple AudioToolbox AAC streams at 320 kbps CBR and writes Native Instruments Stem metadata
+- The AAC Stem File workflow creates one easy-to-share `.stem.mp4` using five Apple AudioToolbox AAC streams at 320 kbps CBR and writes Native Instruments Stem metadata
 - Experimental lossless mode accepts only uncompressed PCM WAV/AIFF sources in a tested profile (16-bit/44.1 kHz or 24-bit/48 kHz), stores them as ALAC in Traktor's configured Stems folder, and safely links them to an existing track in `collection.nml`
 - Decodes and SHA-256 verifies every packaged lossless stream against its source before installation
 - Can ask Traktor to save and quit normally before installation, then relaunch it afterward
 - Detects when a newly analyzed track ID has not yet been saved, then closes Traktor, rechecks the collection, and continues automatically
-- Opens with a workflow guide explaining that lossless installation requires the exact stereo master to be imported and analyzed in Traktor first
+- Opens with a workflow guide explaining what the app does and walking through the selected workflow; users can choose **Don't Show Again** and reopen it later with **How It Works**
+- Highlights empty file slots, verifies the complete audio set automatically, and identifies incompatible files with a specific remedy
 - Measures the unprocessed four-stem sum and enables limiter protection only when needed
 - Creates a Traktor-compatible `.stem.mp4`
 
@@ -33,7 +37,7 @@ The current build supports **Apple Silicon Macs** running **macOS 14 or newer**.
 4. Other
 5. Vocals
 
-All five inputs must be stereo and must have matching sample rates and durations. WAV, AIFF, AAC/M4A, and MP3 inputs are supported at 44.1, 48, 88.2, or 96 kHz. The app does not perform source separation, resampling, time-stretching, normalization, or remixing.
+The four role names are defaults required by the internal Traktor layout, but their displayed names can be changed in the app. All five inputs must be stereo and must have matching sample rates and durations. WAV, AIFF, AAC/M4A, and MP3 inputs are supported at 44.1, 48, 88.2, or 96 kHz. The app does not perform source separation, resampling, time-stretching, normalization, or remixing.
 
 ## Installation
 
@@ -68,7 +72,7 @@ macos/scripts/build-app.sh
 
 The completed app is written to `macos/build/Traktor Stem Packager.app`.
 
-Portable AAC remains the shareable standalone `.stem.mp4` option. Lossless ALAC is an experimental linked mode: the original master must already be imported and analyzed in Traktor Pro 4, and the app creates a timestamped collection backup before making the link. If Traktor is open, the app requests a normal save-and-quit before installation and relaunches it afterward.
+The AAC Stem File workflow is the shareable standalone `.stem.mp4` option. Lossless ALAC is an experimental linked mode: the original master must already be imported and analyzed in Traktor Pro 4, and the app creates a timestamped collection backup before making the link. If Traktor is open, the app requests a normal save-and-quit before installation and relaunches it afterward.
 
 The command-line packaging engine can also be run directly:
 

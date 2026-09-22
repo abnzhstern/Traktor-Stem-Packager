@@ -7,7 +7,7 @@ struct ContentView: View {
     @EnvironmentObject private var updateChecker: UpdateChecker
     @State private var showDetails = false
     @State private var showWorkflowGuide = false
-    @AppStorage("hasSeenWorkflowGuideV1") private var hasSeenWorkflowGuide = false
+    @AppStorage("hideWorkflowGuideOnLaunch") private var hideWorkflowGuideOnLaunch = false
 
     private let panel = Color(red: 0.105, green: 0.11, blue: 0.125)
     private let background = Color(red: 0.065, green: 0.068, blue: 0.078)
@@ -39,7 +39,7 @@ struct ContentView: View {
         .background(background)
         .preferredColorScheme(.dark)
         .onAppear {
-            if !hasSeenWorkflowGuide { showWorkflowGuide = true }
+            if !hideWorkflowGuideOnLaunch { showWorkflowGuide = true }
         }
         .sheet(isPresented: $showWorkflowGuide) {
             workflowGuide
@@ -106,15 +106,19 @@ struct ContentView: View {
             break
         }
 
+        if model.folderImportNeedsReview {
+            return ("REVIEW ASSIGNMENTS", "Check where the five files landed. Drag a file onto another row to swap them, then click CONFIRM ASSIGNMENTS.", "arrow.up.arrow.down.circle.fill", .orange)
+        }
+
         if model.mode == .portableAAC {
             if !model.hasAllFiles {
-                return ("STEP 1", "Add the stereo master and four matching stems below.", "1.circle.fill", .blue)
+                return ("STEP 1", "Add your master and four stem files, or import a five-file folder.", "1.circle.fill", .blue)
             }
-            return ("STEP 2", "Review the imported metadata, then click CREATE PORTABLE STEM FILE.", "2.circle.fill", .green)
+            return ("STEP 2", "Review the imported metadata, then click CREATE AAC STEM FILE.", "2.circle.fill", .green)
         }
 
         if !model.hasAllFiles {
-            return ("STEP 1", "In Traktor, import and analyze the exact stereo master. Then add that master and the four stems below.", "1.circle.fill", .blue)
+            return ("STEP 1", "In Traktor, import and analyze the exact stereo master. Then add that master and four stems, or import their five-file folder.", "1.circle.fill", .blue)
         }
         if model.collectionURL == nil || model.stemsDirectoryURL == nil {
             return ("STEP 2", "Confirm the Traktor Collection and Stems folder locations.", "2.circle.fill", .blue)
@@ -148,10 +152,24 @@ struct ContentView: View {
                 }
             }
 
+            VStack(alignment: .leading, spacing: 5) {
+                Text("THIS APP PACKAGES EXISTING STEMS")
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(0.6)
+                Text("It does not separate a finished song or create stems like NuoStems. Use four stems you created yourself or received from a producer, composer, label, or stem-separation service, plus the matching stereo master. Add them individually or use Import Folder to auto-assign a five-file folder for review.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.white.opacity(0.68))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.blue.opacity(0.08))
+            .overlay(Rectangle().stroke(Color.blue.opacity(0.22)))
+
             guideRow(
                 icon: "shippingbox.fill",
-                title: "Portable Stem File",
-                detail: "No Traktor preparation is required. Add the stereo master and four matching stems, then create the shareable AAC Stem file."
+                title: "AAC Stem File",
+                detail: "The easiest workflow. No Traktor preparation is required. Add the stereo master and four matching stems, then create one shareable 320 kbps AAC Stem file."
             )
             guideRow(
                 icon: "waveform.badge.checkmark",
@@ -168,9 +186,17 @@ struct ContentView: View {
                 .overlay(Rectangle().stroke(Color.orange.opacity(0.22)))
 
             HStack {
+                Button(hideWorkflowGuideOnLaunch ? "SHOW AT LAUNCH" : "DON’T SHOW AGAIN") {
+                    if hideWorkflowGuideOnLaunch {
+                        hideWorkflowGuideOnLaunch = false
+                    } else {
+                        hideWorkflowGuideOnLaunch = true
+                        showWorkflowGuide = false
+                    }
+                }
+                .buttonStyle(.bordered)
                 Spacer()
                 Button("GET STARTED") {
-                    hasSeenWorkflowGuide = true
                     showWorkflowGuide = false
                 }
                 .buttonStyle(.borderedProminent)
@@ -300,10 +326,10 @@ struct ContentView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("v0.6.0-beta.5")
+                Text("v0.6.0-beta.6")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.62))
-                Text("PORTABLE + VERIFIED LOSSLESS")
+                Text("AAC + VERIFIED LOSSLESS")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.35))
                 Button("HOW IT WORKS") { showWorkflowGuide = true }
@@ -374,19 +400,66 @@ struct ContentView: View {
     }
 
     private var tracksPanel: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Text("ADD YOUR AUDIO FILES")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1.0)
+                    .foregroundStyle(Color.white.opacity(0.45))
+                Spacer()
+                if model.folderImportNeedsReview {
+                    Text("DRAG TO SWAP")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(Color.orange)
+                    Button("CONFIRM ASSIGNMENTS") { model.confirmFolderAssignments() }
+                        .font(.system(size: 9, weight: .semibold))
+                        .buttonStyle(.borderedProminent)
+                        .tint(Color.orange.opacity(0.8))
+                } else if model.state == .validating {
+                    ProgressView().controlSize(.small)
+                    Text("CHECKING FILES")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(Color.blue.opacity(0.9))
+                } else if model.audioSetValidated {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Color.green)
+                    Text("ALL AUDIO FILES READY")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(Color.green)
+                } else if case .failed = model.state {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(Color.red)
+                    Text(model.validationProblemRoles.isEmpty ? "CHECK MESSAGE BELOW" : "CHECK HIGHLIGHTED FILES")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(Color.red)
+                } else {
+                    Text("MASTER + 4 STEMS")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.32))
+                }
+                if !model.folderImportNeedsReview {
+                    Button("IMPORT FOLDER") { chooseAudioFolder() }
+                        .font(.system(size: 9, weight: .semibold))
+                        .buttonStyle(.bordered)
+                }
+            }
+            .padding(.horizontal, 2)
+
             ForEach([AudioRole.drums, .bass, .other, .vocals, .master]) { role in
                 FileDropRow(
                     role: role,
                     displayName: stemNameBinding(role),
                     url: model.files[role],
+                    isValidated: model.audioSetValidated,
+                    hasProblem: model.validationProblemRoles.contains(role),
                     select: { model.setFile($0, for: role) },
                     clear: { model.clear(role) }
                 )
             }
         }
         .padding(10)
-        .background(panel)
+        .background(model.audioSetValidated ? Color.green.opacity(0.035) : panel)
+        .overlay(Rectangle().stroke(model.audioSetValidated ? Color.green.opacity(0.35) : Color.clear))
     }
 
     private var statusPanel: some View {
@@ -457,6 +530,18 @@ struct ContentView: View {
         panel.allowedContentTypes = [.jpeg, .png]
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK { model.setArtwork(panel.url) }
+    }
+
+    private func chooseAudioFolder() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = false
+        panel.message = "Choose a folder containing one stereo master and four stems"
+        if panel.runModal() == .OK, let directory = panel.url {
+            model.importFolder(directory)
+        }
     }
 
     private func chooseCollection() {
