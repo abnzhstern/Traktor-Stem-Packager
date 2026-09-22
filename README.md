@@ -21,6 +21,7 @@ The current build supports **Apple Silicon Macs** running **macOS 14 or newer**.
 - Decodes and SHA-256 verifies every packaged lossless stream against its source before installation
 - Can ask Traktor to save and quit normally before installation, then relaunch it afterward
 - Detects when a newly analyzed track ID has not yet been saved, then closes Traktor, rechecks the collection, and continues automatically
+- Opens with a workflow guide explaining that lossless installation requires the exact stereo master to be imported and analyzed in Traktor first
 - Measures the unprocessed four-stem sum and enables limiter protection only when needed
 - Creates a Traktor-compatible `.stem.mp4`
 

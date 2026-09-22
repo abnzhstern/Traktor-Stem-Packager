@@ -6,6 +6,8 @@ struct ContentView: View {
     @EnvironmentObject private var model: PackagerModel
     @EnvironmentObject private var updateChecker: UpdateChecker
     @State private var showDetails = false
+    @State private var showWorkflowGuide = false
+    @AppStorage("hasSeenWorkflowGuideV1") private var hasSeenWorkflowGuide = false
 
     private let panel = Color(red: 0.105, green: 0.11, blue: 0.125)
     private let background = Color(red: 0.065, green: 0.068, blue: 0.078)
@@ -35,6 +37,12 @@ struct ContentView: View {
         .frame(minWidth: 720, idealWidth: 780, minHeight: 520, idealHeight: 760)
         .background(background)
         .preferredColorScheme(.dark)
+        .onAppear {
+            if !hasSeenWorkflowGuide { showWorkflowGuide = true }
+        }
+        .sheet(isPresented: $showWorkflowGuide) {
+            workflowGuide
+        }
         .task { await updateChecker.checkAutomatically() }
         .task {
             while !Task.isCancelled {
@@ -57,6 +65,78 @@ struct ContentView: View {
                 dismissButton: .default(Text("OK"))
             )
         }
+    }
+
+    private var workflowGuide: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 12) {
+                Image(nsImage: NSApplication.shared.applicationIconImage)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 58, height: 58)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("BEFORE YOU BEGIN")
+                        .font(.system(size: 16, weight: .bold))
+                        .tracking(0.8)
+                    Text("Choose the workflow that matches your goal.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.white.opacity(0.55))
+                }
+            }
+
+            guideRow(
+                icon: "shippingbox.fill",
+                title: "Portable Stem File",
+                detail: "No Traktor preparation is required. Add the stereo master and four matching stems, then create the shareable AAC Stem file."
+            )
+            guideRow(
+                icon: "waveform.badge.checkmark",
+                title: "Lossless Traktor Installation",
+                detail: "First import the exact stereo master into Traktor Pro 4 and analyze it. Then return here and add that same master plus the four stems. You may leave Traktor open—the app will save, close, and reopen it when needed."
+            )
+
+            Text("Important: use the same master file in both Traktor and this app. A different copy or renamed replacement may not match Traktor’s library entry.")
+                .font(.system(size: 10))
+                .foregroundStyle(Color.orange.opacity(0.9))
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.orange.opacity(0.08))
+                .overlay(Rectangle().stroke(Color.orange.opacity(0.22)))
+
+            HStack {
+                Spacer()
+                Button("GET STARTED") {
+                    hasSeenWorkflowGuide = true
+                    showWorkflowGuide = false
+                }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(24)
+        .frame(width: 590)
+        .background(background)
+        .preferredColorScheme(.dark)
+    }
+
+    private func guideRow(icon: String, title: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: 13) {
+            Image(systemName: icon)
+                .font(.system(size: 20))
+                .foregroundStyle(Color.white.opacity(0.8))
+                .frame(width: 28)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                Text(detail)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.white.opacity(0.55))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(13)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(panel)
     }
 
     private var modePanel: some View {
@@ -100,76 +180,55 @@ struct ContentView: View {
 
     private var nativeConfigPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("LOSSLESS INSTALLATION READINESS")
+            Text("TRAKTOR LOCATIONS")
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(1.0)
                 .foregroundStyle(Color.white.opacity(0.45))
-            readinessRow(
-                icon: model.collectionURL == nil ? "1.circle" : "checkmark.circle.fill",
-                color: model.collectionURL == nil ? .orange : .green,
-                title: "Traktor collection",
-                detail: model.collectionURL?.lastPathComponent ?? "Choose collection.nml"
-            )
             pathRow(
-                label: "Library",
+                label: "Collection",
                 url: model.collectionURL,
                 emptyText: "Choose collection.nml",
                 action: chooseCollection
             )
-            readinessRow(
-                icon: model.nativeReadiness?.ready == true ? "checkmark.circle.fill" : "2.circle",
-                color: model.nativeReadiness?.ready == true ? .green : .orange,
-                title: "Original master in Traktor",
-                detail: nativeReadinessMessage
-            )
-            readinessRow(
-                icon: model.stemsDirectoryURL == nil ? "3.circle" : "checkmark.circle.fill",
-                color: model.stemsDirectoryURL == nil ? .orange : .green,
-                title: "Traktor Stems folder",
-                detail: model.stemsDirectoryURL == nil ? "Choose the folder configured in Traktor" : "Ready"
-            )
             pathRow(
-                label: "Folder",
+                label: "Stems folder",
                 url: model.stemsDirectoryURL,
                 emptyText: "Choose Traktor’s configured Stems folder",
                 action: chooseStemsDirectory
             )
-            readinessRow(
-                icon: model.traktorRunning ? "arrow.clockwise.circle.fill" : "checkmark.circle.fill",
-                color: .green,
-                title: "Safe Traktor handoff",
-                detail: model.traktorRunning ? "Traktor will save, close, and reopen automatically" : "Traktor is closed and ready"
-            )
-            Text("Lossless test profiles: uncompressed stereo PCM WAV/AIFF at 16-bit/44.1 kHz or 24-bit/48 kHz. A collection backup is created automatically.")
-                .font(.system(size: 10))
-                .foregroundStyle(Color.white.opacity(0.4))
+            nativeAttentionBanner
         }
         .padding(14)
         .background(panel)
     }
 
-    private var nativeReadinessMessage: String {
-        if model.files[.master] == nil { return "Add the exact stereo master used in Traktor" }
-        if model.collectionURL == nil { return "Choose the Traktor collection first" }
-        if model.traktorRunning && model.nativeReadiness?.ready == false {
-            return "Analysis may not be saved yet — close Traktor to refresh"
-        }
-        return model.nativeReadiness?.message ?? "Checking the selected collection…"
-    }
-
-    private func readinessRow(icon: String, color: Color, title: String, detail: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 9) {
-            Image(systemName: icon)
-                .foregroundStyle(color)
-                .frame(width: 16)
-            Text(title)
-                .font(.system(size: 11, weight: .semibold))
-                .frame(width: 150, alignment: .leading)
-            Text(detail)
+    @ViewBuilder
+    private var nativeAttentionBanner: some View {
+        if model.files[.master] != nil, model.collectionURL != nil {
+            if model.nativeReadiness == nil {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Checking the master against Traktor’s saved collection…")
+                }
                 .font(.system(size: 10))
-                .foregroundStyle(Color.white.opacity(0.48))
-                .lineLimit(2)
-            Spacer(minLength: 0)
+                .foregroundStyle(Color.white.opacity(0.5))
+                .padding(.top, 2)
+            } else if let readiness = model.nativeReadiness, !readiness.ready {
+                HStack(alignment: .top, spacing: 9) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .foregroundStyle(Color.orange)
+                    Text(model.traktorRunning
+                         ? "Traktor may not have saved this master’s analysis yet. Use SAVE, CLOSE TRAKTOR & CONTINUE below."
+                         : readiness.message)
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.white.opacity(0.7))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                }
+                .padding(10)
+                .background(Color.orange.opacity(0.08))
+                .overlay(Rectangle().stroke(Color.orange.opacity(0.2)))
+            }
         }
     }
 
@@ -208,12 +267,16 @@ struct ContentView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("v0.6.0-beta.4")
+                Text("v0.6.0-beta.5")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.62))
                 Text("PORTABLE + VERIFIED LOSSLESS")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.35))
+                Button("HOW IT WORKS") { showWorkflowGuide = true }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.55))
             }
         }
         .padding(.horizontal, 16)
