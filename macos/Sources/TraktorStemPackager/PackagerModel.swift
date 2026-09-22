@@ -64,8 +64,8 @@ final class PackagerModel: ObservableObject {
     var audioSetValidated: Bool {
         guard hasAllFiles, report != nil else { return false }
         switch state {
-        case .ready, .packaging, .complete: true
-        case .waiting, .validating, .failed: false
+        case .ready, .packaging, .complete: return true
+        case .waiting, .validating, .failed: return false
         }
     }
     var assignmentsLocked: Bool { audioSetValidated && !folderImportNeedsReview }
