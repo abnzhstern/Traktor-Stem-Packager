@@ -18,6 +18,7 @@ struct ContentView: View {
             ScrollView {
                 VStack(spacing: 14) {
                     modePanel
+                    workflowStepPanel
                     if model.mode == .portableAAC {
                         metadataPanel
                     } else {
@@ -65,6 +66,69 @@ struct ContentView: View {
                 dismissButton: .default(Text("OK"))
             )
         }
+    }
+
+    private var workflowStepPanel: some View {
+        let step = currentWorkflowStep
+        return HStack(alignment: .center, spacing: 11) {
+            Image(systemName: step.icon)
+                .font(.system(size: 16))
+                .foregroundStyle(step.color)
+                .frame(width: 22)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(step.label)
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(1.0)
+                    .foregroundStyle(step.color.opacity(0.9))
+                Text(step.message)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.75))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(step.color.opacity(0.07))
+        .overlay(Rectangle().stroke(step.color.opacity(0.18)))
+    }
+
+    private var currentWorkflowStep: (label: String, message: String, icon: String, color: Color) {
+        switch model.state {
+        case .validating:
+            return ("CHECKING FILES", "Verifying format, duration, synchronization and peak level…", "waveform", .blue)
+        case .packaging:
+            return ("WORKING", model.statusText, "gearshape.2.fill", .blue)
+        case .complete:
+            return ("COMPLETE", model.statusText, "checkmark.circle.fill", .green)
+        case .failed:
+            return ("ACTION NEEDED", model.statusText, "exclamationmark.triangle.fill", .orange)
+        default:
+            break
+        }
+
+        if model.mode == .portableAAC {
+            if !model.hasAllFiles {
+                return ("STEP 1", "Add the stereo master and four matching stems below.", "1.circle.fill", .blue)
+            }
+            return ("STEP 2", "Review the imported metadata, then click CREATE PORTABLE STEM FILE.", "2.circle.fill", .green)
+        }
+
+        if !model.hasAllFiles {
+            return ("STEP 1", "In Traktor, import and analyze the exact stereo master. Then add that master and the four stems below.", "1.circle.fill", .blue)
+        }
+        if model.collectionURL == nil || model.stemsDirectoryURL == nil {
+            return ("STEP 2", "Confirm the Traktor Collection and Stems folder locations.", "2.circle.fill", .blue)
+        }
+        if model.nativeReadiness == nil {
+            return ("CHECKING TRAKTOR", "Checking the master against Traktor’s saved collection…", "magnifyingglass.circle.fill", .blue)
+        }
+        if model.nativeReadiness?.ready == false {
+            if model.traktorRunning {
+                return ("STEP 3", "Click SAVE, CLOSE TRAKTOR & CONTINUE so Traktor can save the analysis.", "3.circle.fill", .orange)
+            }
+            return ("ACTION NEEDED", "Open Traktor, import and analyze this exact master, then return here.", "exclamationmark.triangle.fill", .orange)
+        }
+        return ("STEP 3", "Everything is ready. Click VERIFY & INSTALL LOSSLESS STEMS.", "3.circle.fill", .green)
     }
 
     private var workflowGuide: some View {
@@ -196,40 +260,9 @@ struct ContentView: View {
                 emptyText: "Choose Traktor’s configured Stems folder",
                 action: chooseStemsDirectory
             )
-            nativeAttentionBanner
         }
         .padding(14)
         .background(panel)
-    }
-
-    @ViewBuilder
-    private var nativeAttentionBanner: some View {
-        if model.files[.master] != nil, model.collectionURL != nil {
-            if model.nativeReadiness == nil {
-                HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
-                    Text("Checking the master against Traktor’s saved collection…")
-                }
-                .font(.system(size: 10))
-                .foregroundStyle(Color.white.opacity(0.5))
-                .padding(.top, 2)
-            } else if let readiness = model.nativeReadiness, !readiness.ready {
-                HStack(alignment: .top, spacing: 9) {
-                    Image(systemName: "exclamationmark.circle.fill")
-                        .foregroundStyle(Color.orange)
-                    Text(model.traktorRunning
-                         ? "Traktor may not have saved this master’s analysis yet. Use SAVE, CLOSE TRAKTOR & CONTINUE below."
-                         : readiness.message)
-                        .font(.system(size: 10))
-                        .foregroundStyle(Color.white.opacity(0.7))
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 0)
-                }
-                .padding(10)
-                .background(Color.orange.opacity(0.08))
-                .overlay(Rectangle().stroke(Color.orange.opacity(0.2)))
-            }
-        }
     }
 
     private func pathRow(label: String, url: URL?, emptyText: String, action: @escaping () -> Void) -> some View {
