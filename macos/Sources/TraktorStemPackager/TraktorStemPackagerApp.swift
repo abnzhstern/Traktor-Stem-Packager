@@ -19,6 +19,13 @@ struct TraktorStemPackagerApp: App {
                     updateChecker.checkManually()
                 }
             }
+            CommandMenu("Tracks") {
+                Button("Clear All Tracks") {
+                    model.clearAll()
+                }
+                .keyboardShortcut("k", modifiers: [.command, .shift])
+                .disabled(model.files.isEmpty)
+            }
         }
     }
 }

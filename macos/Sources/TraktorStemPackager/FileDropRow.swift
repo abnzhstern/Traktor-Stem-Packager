@@ -6,8 +6,10 @@ struct FileDropRow: View {
     @Binding var displayName: String
     let url: URL?
     let isValidated: Bool
+    let isLocked: Bool
     let hasProblem: Bool
     let select: (URL) -> Void
+    let move: (AudioRole) -> Void
     let clear: () -> Void
 
     @State private var importing = false
@@ -30,32 +32,59 @@ struct FileDropRow: View {
             .frame(width: 116, height: 42, alignment: .leading)
             .background(role.color)
 
-            Button {
-                importing = true
-            } label: {
-                HStack {
+            HStack(spacing: 8) {
+                Button {
+                    guard !isLocked else { return }
+                    importing = true
+                } label: {
+                    HStack(spacing: 8) {
                     Image(systemName: url == nil ? "plus.circle" : "checkmark.circle.fill")
                         .foregroundStyle(indicatorColor)
                     Text(url?.lastPathComponent ?? "Drop audio file or click to choose")
                         .lineLimit(1)
                         .foregroundStyle(url == nil ? Color.white.opacity(0.48) : Color.white.opacity(0.88))
                     Spacer()
-                    if url != nil {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(Color.white.opacity(0.4))
-                            .onTapGesture(perform: clear)
                     }
                 }
-                .padding(.horizontal, 12)
-                .frame(maxWidth: .infinity, minHeight: 42)
-                .background(rowBackground)
-                .overlay(Rectangle().stroke(rowBorder, lineWidth: hasProblem || url == nil ? 1.5 : 1))
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+
+                if url != nil {
+                    if isLocked {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 9))
+                            .foregroundStyle(Color.green.opacity(0.75))
+                            .help("Assignments are accepted. Choose Edit Assignments to move files.")
+                    } else {
+                        Menu {
+                            ForEach(AudioRole.allCases.filter { $0 != role }) { destination in
+                                Button("Move/Swap with \(destination.rawValue)") { move(destination) }
+                            }
+                        } label: {
+                            Image(systemName: "arrow.up.arrow.down.circle")
+                                .foregroundStyle(Color.white.opacity(0.55))
+                        }
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
+                        .help("Move this file to another slot; occupied slots will swap")
+                    }
+                    Button(action: clear) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(Color.white.opacity(0.4))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Remove this file")
+                }
             }
-            .buttonStyle(.plain)
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, minHeight: 42)
+            .background(rowBackground)
+            .overlay(Rectangle().stroke(rowBorder, lineWidth: hasProblem || url == nil ? 1.5 : 1))
             .fileImporter(isPresented: $importing, allowedContentTypes: [.audio], allowsMultipleSelection: false) { result in
                 if case .success(let urls) = result, let first = urls.first { select(first) }
             }
             .onDrop(of: [UTType.fileURL], isTargeted: $targeted) { providers in
+                guard !isLocked else { return false }
                 guard let provider = providers.first else { return false }
                 _ = provider.loadObject(ofClass: URL.self) { object, _ in
                     if let object { DispatchQueue.main.async { select(object) } }
@@ -63,7 +92,7 @@ struct FileDropRow: View {
                 return true
             }
             .onDrag {
-                guard let url else { return NSItemProvider() }
+                guard !isLocked, let url else { return NSItemProvider() }
                 return NSItemProvider(object: url as NSURL)
             }
         }

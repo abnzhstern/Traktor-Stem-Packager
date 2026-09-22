@@ -6,7 +6,7 @@ WHAT THIS APP IS
 
 Traktor Stem Packager does not create or separate stems like NuoStems. It packages four stems you already created or received from a producer, composer, label, or stem-separation service, together with the matching stereo master.
 
-Files can be added individually, or Import Folder can propose assignments from a folder containing exactly five supported audio files. Always review the proposed assignments before confirming them; drag a file onto another row to swap the two.
+Files can be added individually, or Import Folder can propose assignments from a folder containing exactly five supported audio files. Always review the proposed assignments before accepting them. Use the visible Move/Swap control or drag a file onto another row. Accepted assignments lock; choose Edit Assignments to change them. Clear All empties the queue without deleting source files.
 
 IMPORTANT
 Keep these two items together in this folder:
@@ -50,3 +50,11 @@ Updates use the same app name and Applications location. The app does not instal
 The installer does not disable Gatekeeper or change system-wide Mac security settings.
 
 Because this free build is not signed and notarized through Apple's Developer Program, macOS behavior may vary by version or security software. If installation fails, copy the complete Terminal error message when asking for help.
+
+LOSSLESS TRAKTOR HANDOFF
+
+The lossless workflow can send the selected master to Traktor and guide you through analysis. Traktor itself creates the analysis ID; if automatic analysis is disabled, choose Analyze inside Traktor.
+
+Traktor must close before the app edits collection.nml. At that step you can choose:
+• I’ll Quit Traktor — avoids the macOS App Management permission. Quit Traktor normally and the app will detect it and continue automatically.
+• Close Automatically — the app asks Traktor to quit and reopen. macOS may ask for App Management permission. If permission is denied, quit Traktor normally; the app will keep waiting and continue without restarting.

@@ -47,7 +47,7 @@ struct ContentView: View {
         .task { await updateChecker.checkAutomatically() }
         .task {
             while !Task.isCancelled {
-                model.refreshTraktorStatus()
+                await model.pollTraktorStatus()
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
             }
         }
@@ -86,6 +86,21 @@ struct ContentView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
+            if model.mode == .nativeLossless,
+               model.files[.master] != nil,
+               model.nativeReadiness?.ready != true,
+               model.state != .packaging {
+                VStack(alignment: .trailing, spacing: 6) {
+                    Button("SEND MASTER TO TRAKTOR") { model.sendMasterToTraktor() }
+                        .font(.system(size: 9, weight: .semibold))
+                        .buttonStyle(.borderedProminent)
+                    Button("CHECK TRAKTOR AGAIN") {
+                        Task { await model.checkTraktorForMaster() }
+                    }
+                    .font(.system(size: 9, weight: .semibold))
+                    .buttonStyle(.bordered)
+                }
+            }
         }
         .padding(12)
         .background(step.color.opacity(0.07))
@@ -107,7 +122,7 @@ struct ContentView: View {
         }
 
         if model.folderImportNeedsReview {
-            return ("REVIEW ASSIGNMENTS", "Check where the five files landed. Drag a file onto another row to swap them, then click CONFIRM ASSIGNMENTS.", "arrow.up.arrow.down.circle.fill", .orange)
+            return ("REVIEW ASSIGNMENTS", "Check all five slots. Use Move/Swap or drag files between rows, then choose Accept Assignments.", "arrow.up.arrow.down.circle.fill", .orange)
         }
 
         if model.mode == .portableAAC {
@@ -117,22 +132,25 @@ struct ContentView: View {
             return ("STEP 2", "Review the imported metadata, then click CREATE AAC STEM FILE.", "2.circle.fill", .green)
         }
 
-        if !model.hasAllFiles {
-            return ("STEP 1", "In Traktor, import and analyze the exact stereo master. Then add that master and four stems, or import their five-file folder.", "1.circle.fill", .blue)
+        if model.files[.master] == nil {
+            return ("STEP 1", "Add the exact stereo master here first. You can add the other stems now or later.", "1.circle.fill", .blue)
         }
         if model.collectionURL == nil || model.stemsDirectoryURL == nil {
-            return ("STEP 2", "Confirm the Traktor Collection and Stems folder locations.", "2.circle.fill", .blue)
+            return ("STEP 2", "Confirm the Traktor Collection and Stems folder locations below.", "2.circle.fill", .blue)
         }
         if model.nativeReadiness == nil {
             return ("CHECKING TRAKTOR", "Checking the master against Traktor’s saved collection…", "magnifyingglass.circle.fill", .blue)
         }
         if model.nativeReadiness?.ready == false {
             if model.traktorRunning {
-                return ("STEP 3", "Click SAVE, CLOSE TRAKTOR & CONTINUE so Traktor can save the analysis.", "3.circle.fill", .orange)
+                return ("STEP 3", "In Traktor, analyze the master. Then return and choose Check Traktor Again. If it is not found, use Save, Close Traktor & Continue.", "3.circle.fill", .orange)
             }
-            return ("ACTION NEEDED", "Open Traktor, import and analyze this exact master, then return here.", "exclamationmark.triangle.fill", .orange)
+            return ("STEP 3", "Choose Send Master to Traktor. Analyze it there, then return and choose Check Traktor Again.", "3.circle.fill", .blue)
         }
-        return ("STEP 3", "Everything is ready. Click VERIFY & INSTALL LOSSLESS STEMS.", "3.circle.fill", .green)
+        if !model.hasAllFiles {
+            return ("STEP 4", "The analyzed master was found. Add the remaining four stems or import their five-file folder.", "4.circle.fill", .blue)
+        }
+        return ("READY TO INSTALL", "The master is linked and all five files are accepted. Choose Verify & Install Lossless Stems.", "checkmark.circle.fill", .green)
     }
 
     private var workflowGuide: some View {
@@ -174,10 +192,10 @@ struct ContentView: View {
             guideRow(
                 icon: "waveform.badge.checkmark",
                 title: "Lossless Traktor Installation",
-                detail: "First import the exact stereo master into Traktor Pro 4 and analyze it. Then return here and add that same master plus the four stems. You may leave Traktor open—the app will save, close, and reopen it when needed."
+                detail: "Add the exact stereo master here, then use Send Master to Traktor. Analyze it in Traktor and return. The app checks the saved track ID, verifies the stems, and guides you through closing Traktor only when required."
             )
 
-            Text("Important: use the same master file in both Traktor and this app. A different copy or renamed replacement may not match Traktor’s library entry.")
+            Text("Important: use the same master file in both Traktor and this app. A different copy may create a separate library entry and will not inherit the original track’s cues or beat grid.")
                 .font(.system(size: 10))
                 .foregroundStyle(Color.orange.opacity(0.9))
                 .padding(10)
@@ -195,12 +213,17 @@ struct ContentView: View {
                     }
                 }
                 .buttonStyle(.bordered)
+                Button("QUIT APP") {
+                    NSApplication.shared.terminate(nil)
+                }
+                .buttonStyle(.bordered)
                 Spacer()
-                Button("GET STARTED") {
+                Button("CLOSE") {
                     showWorkflowGuide = false
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
+                .keyboardShortcut(.cancelAction)
             }
         }
         .padding(24)
@@ -326,7 +349,7 @@ struct ContentView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("v0.6.0-beta.6")
+                Text("v0.6.0-beta.7")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.62))
                 Text("AAC + VERIFIED LOSSLESS")
@@ -408,10 +431,10 @@ struct ContentView: View {
                     .foregroundStyle(Color.white.opacity(0.45))
                 Spacer()
                 if model.folderImportNeedsReview {
-                    Text("DRAG TO SWAP")
+                    Text("REVIEW • MOVE/SWAP ENABLED")
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(Color.orange)
-                    Button("CONFIRM ASSIGNMENTS") { model.confirmFolderAssignments() }
+                    Button("ACCEPT ASSIGNMENTS") { model.confirmFolderAssignments() }
                         .font(.system(size: 9, weight: .semibold))
                         .buttonStyle(.borderedProminent)
                         .tint(Color.orange.opacity(0.8))
@@ -423,9 +446,12 @@ struct ContentView: View {
                 } else if model.audioSetValidated {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(Color.green)
-                    Text("ALL AUDIO FILES READY")
+                    Text("ACCEPTED • ASSIGNMENTS LOCKED")
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(Color.green)
+                    Button("EDIT ASSIGNMENTS") { model.editAssignments() }
+                        .font(.system(size: 9, weight: .semibold))
+                        .buttonStyle(.bordered)
                 } else if case .failed = model.state {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(Color.red)
@@ -442,6 +468,11 @@ struct ContentView: View {
                         .font(.system(size: 9, weight: .semibold))
                         .buttonStyle(.bordered)
                 }
+                if !model.files.isEmpty {
+                    Button("CLEAR ALL") { model.clearAll() }
+                        .font(.system(size: 9, weight: .semibold))
+                        .buttonStyle(.bordered)
+                }
             }
             .padding(.horizontal, 2)
 
@@ -451,8 +482,10 @@ struct ContentView: View {
                     displayName: stemNameBinding(role),
                     url: model.files[role],
                     isValidated: model.audioSetValidated,
+                    isLocked: model.assignmentsLocked,
                     hasProblem: model.validationProblemRoles.contains(role),
                     select: { model.setFile($0, for: role) },
+                    move: { model.moveFile(from: role, to: $0) },
                     clear: { model.clear(role) }
                 )
             }
@@ -492,6 +525,26 @@ struct ContentView: View {
                     .foregroundStyle(Color.white.opacity(0.45))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(12)
+            }
+
+            if let recovery = model.recoveryText {
+                Divider().overlay(Color.white.opacity(0.08))
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "wrench.and.screwdriver.fill")
+                        .foregroundStyle(Color.orange.opacity(0.9))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("WHAT TO DO NEXT")
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(0.8)
+                            .foregroundStyle(Color.orange.opacity(0.9))
+                        Text(recovery)
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.white.opacity(0.68))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(12)
             }
         }
         .background(panel)
