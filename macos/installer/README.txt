@@ -4,9 +4,9 @@ This build is not Apple-notarized. Installation may require one brief Terminal s
 
 WHAT THIS APP IS
 
-Traktor Stem Packager does not create or separate stems like NuoStems. It packages four stems you already created or received from a producer, composer, label, or stem-separation service, together with the matching stereo master.
+Traktor Stem Packager does not create or separate stems. It packages four stems you already created or received from a producer, composer, label, or stem-separation service, together with the matching stereo master.
 
-Files can be added individually, or Import Folder can propose assignments from a folder containing exactly five supported audio files. Always review the proposed assignments before accepting them. Use the visible Move/Swap control or drag a file onto another row. Accepted assignments lock; choose Edit Assignments to change them. Clear All empties the queue without deleting source files.
+Files can be added individually, or Import Folder can propose assignments from a folder containing exactly five supported audio files. Always review the proposed assignments before accepting them. Drag a file onto another slot to reassign it. Accepted assignments lock; choose Edit Assignments to change them. Clear All empties the queue without deleting source files.
 
 IMPORTANT
 Keep these two items together in this folder:

@@ -9,7 +9,6 @@ struct FileDropRow: View {
     let isLocked: Bool
     let hasProblem: Bool
     let select: (URL) -> Void
-    let move: (AudioRole) -> Void
     let clear: () -> Void
 
     @State private var importing = false
@@ -56,17 +55,9 @@ struct FileDropRow: View {
                             .foregroundStyle(Color.green.opacity(0.75))
                             .help("Assignments are accepted. Choose Edit Assignments to move files.")
                     } else {
-                        Menu {
-                            ForEach(AudioRole.allCases.filter { $0 != role }) { destination in
-                                Button("Move/Swap with \(destination.rawValue)") { move(destination) }
-                            }
-                        } label: {
-                            Image(systemName: "arrow.up.arrow.down.circle")
-                                .foregroundStyle(Color.white.opacity(0.55))
-                        }
-                        .menuStyle(.borderlessButton)
-                        .fixedSize()
-                        .help("Move this file to another slot; occupied slots will swap")
+                        Image(systemName: "line.3.horizontal")
+                            .foregroundStyle(Color.white.opacity(0.55))
+                            .help("Drag this file onto another slot to reassign it")
                     }
                     Button(action: clear) {
                         Image(systemName: "xmark.circle.fill")

@@ -122,7 +122,7 @@ struct ContentView: View {
         }
 
         if model.folderImportNeedsReview {
-            return ("REVIEW ASSIGNMENTS", "Check all five slots. Use Move/Swap or drag files between rows, then choose Accept Assignments.", "arrow.up.arrow.down.circle.fill", .orange)
+            return ("REVIEW ASSIGNMENTS", "Check all five slots. Drag any file onto another slot to reassign it, then choose Accept Assignments.", "hand.draw.fill", .orange)
         }
 
         if model.mode == .portableAAC {
@@ -174,7 +174,7 @@ struct ContentView: View {
                 Text("THIS APP PACKAGES EXISTING STEMS")
                     .font(.system(size: 11, weight: .bold))
                     .tracking(0.6)
-                Text("It does not separate a finished song or create stems like NuoStems. Use four stems you created yourself or received from a producer, composer, label, or stem-separation service, plus the matching stereo master. Add them individually or use Import Folder to auto-assign a five-file folder for review.")
+                Text("It does not separate a finished song or create stems. Use four stems you created yourself or received from a producer, composer, label, or stem-separation service, plus the matching stereo master. Add them individually or use Import Folder to auto-assign a five-file folder for review.")
                     .font(.system(size: 11))
                     .foregroundStyle(Color.white.opacity(0.68))
                     .fixedSize(horizontal: false, vertical: true)
@@ -349,7 +349,7 @@ struct ContentView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("v0.6.0-beta.7")
+                Text("v0.6.0-beta.8")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.62))
                 Text("AAC + VERIFIED LOSSLESS")
@@ -431,7 +431,7 @@ struct ContentView: View {
                     .foregroundStyle(Color.white.opacity(0.45))
                 Spacer()
                 if model.folderImportNeedsReview {
-                    Text("REVIEW • MOVE/SWAP ENABLED")
+                    Text("REVIEW • DRAG TO REASSIGN")
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(Color.orange)
                     Button("ACCEPT ASSIGNMENTS") { model.confirmFolderAssignments() }
@@ -455,7 +455,7 @@ struct ContentView: View {
                 } else if case .failed = model.state {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(Color.red)
-                    Text(model.validationProblemRoles.isEmpty ? "CHECK MESSAGE BELOW" : "CHECK HIGHLIGHTED FILES")
+                    Text(model.validationProblemRoles.isEmpty ? "ACTION NEEDED" : "CHECK HIGHLIGHTED FILES")
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(Color.red)
                 } else {
@@ -485,7 +485,6 @@ struct ContentView: View {
                     isLocked: model.assignmentsLocked,
                     hasProblem: model.validationProblemRoles.contains(role),
                     select: { model.setFile($0, for: role) },
-                    move: { model.moveFile(from: role, to: $0) },
                     clear: { model.clear(role) }
                 )
             }

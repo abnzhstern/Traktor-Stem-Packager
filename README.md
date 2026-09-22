@@ -2,7 +2,7 @@
 
 A free, open-source macOS utility that packages a stereo master and four matching stems into a Native Instruments-compatible `.stem.mp4` file for Traktor Pro 4.
 
-> **This is a stem packager, not a stem creator.** It does not separate a finished song into stems like NuoStems. It packages four stems you already created or received from a producer, composer, label, or stem-separation service, together with the matching stereo master.
+> **This is a stem packager, not a stem creator.** It does not separate a finished song into stems. It packages four stems you already created or received from a producer, composer, label, or stem-separation service, together with the matching stereo master.
 
 ![Traktor Stem Packager icon](macos/Resources/AppIcon-1024.png)
 
@@ -26,7 +26,7 @@ The current build supports **Apple Silicon Macs** running **macOS 14 or newer**.
 - Sends the exact selected master to Traktor, checks for its saved analysis ID, and always states the next required action
 - Offers either a manual Traktor quit that avoids App Management permission or an automatic close with a seamless manual fallback
 - Preserves the existing Traktor library entry so its cues, beat grid, loops, and other track data remain attached
-- Provides Clear All, visible Move/Swap controls, accepted-assignment locking, and Edit Assignments
+- Provides Clear All, drag-and-drop reassignment, accepted-assignment locking, and Edit Assignments
 - Opens with a workflow guide explaining what the app does and walking through the selected workflow; users can choose **Don't Show Again** and reopen it later with **How It Works**
 - Highlights empty file slots, verifies the complete audio set automatically, and identifies incompatible files with a specific remedy
 - Measures the unprocessed four-stem sum and enables limiter protection only when needed

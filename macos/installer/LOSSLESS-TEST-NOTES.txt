@@ -6,7 +6,7 @@ This app does not create or separate stems. Start with four stems you already
 created or received, plus the matching stereo master.
 
 Before testing:
-1. Confirm the app title bar says v0.6.0-beta.7, then select
+1. Confirm the app title bar says v0.6.0-beta.8, then select
    “Lossless Traktor Installation.”
 2. Choose the collection.nml used by that Traktor installation.
 3. Choose the Stems folder configured in Traktor Pro 4 Preferences.
@@ -15,8 +15,8 @@ Before testing:
    analyzed, add it here and choose CHECK TRAKTOR AGAIN directly.
 5. Add the four matching stems. This test build accepts
    uncompressed PCM WAV/AIFF at 16-bit/44.1 kHz or 24-bit/48 kHz.
-   You can also choose IMPORT FOLDER, review the proposed assignments, use
-   MOVE/SWAP or drag to correct them, and choose ACCEPT ASSIGNMENTS.
+   You can also choose IMPORT FOLDER, review the proposed assignments, drag
+   files between slots to correct them, and choose ACCEPT ASSIGNMENTS.
 6. Click VERIFY & INSTALL LOSSLESS STEMS. If Traktor is open, choose I’LL QUIT
    TRAKTOR to avoid the macOS App Management permission, or CLOSE AUTOMATICALLY
    for the convenience of an automatic handoff.
@@ -38,5 +38,5 @@ For this test, confirm:
 • Each of the four stems plays cleanly without noise, crackles, or pops.
 • Playback remains clean near the end of the track.
 
-ALAC linked stems are experimental in Traktor Pro 4. NUO-STEMS also warns that
-some ALAC files can report corruption near the end, even when playback works.
+ALAC linked stems are experimental in Traktor Pro 4. During testing, confirm
+that playback remains clean through the end of every track.

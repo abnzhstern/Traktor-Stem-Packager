@@ -113,7 +113,7 @@ final class PackagerModel: ObservableObject {
         recoveryText = nil
         state = .waiting
         statusText = folderImportNeedsReview
-            ? "Review the assignments. Use Move/Swap or drag files between rows, then choose Accept Assignments."
+            ? "Review the assignments. Drag files between slots to reassign them, then choose Accept Assignments."
             : hasAllFiles ? "Checking compatibility…" : "Add your master and four stem files, or import a five-file folder."
         if files[.master] != previousMaster, let master = files[.master] {
             title = master.deletingPathExtension().lastPathComponent
@@ -165,7 +165,7 @@ final class PackagerModel: ObservableObject {
             recoveryText = nil
             folderImportNeedsReview = true
             state = .waiting
-            statusText = "Review the assignments. Use Move/Swap or drag files between rows, then choose Accept Assignments."
+            statusText = "Review the assignments. Drag files between slots to reassign them, then choose Accept Assignments."
             if let master = files[.master] {
                 title = master.deletingPathExtension().lastPathComponent
                 Task { await loadMasterMetadata(from: master) }
@@ -194,25 +194,6 @@ final class PackagerModel: ObservableObject {
         recoveryText = nil
         state = .waiting
         statusText = "Assignments unlocked. Move or replace files, then choose Accept Assignments."
-    }
-
-    func moveFile(from source: AudioRole, to destination: AudioRole) {
-        guard !assignmentsLocked, source != destination, let sourceURL = files[source] else { return }
-        let previousMaster = files[.master]
-        let displaced = files[destination]
-        files[destination] = sourceURL
-        files[source] = displaced
-        report = nil
-        validationProblemRoles = []
-        recoveryText = nil
-        folderImportNeedsReview = true
-        state = .waiting
-        statusText = "Assignments changed. Review all five slots, then choose Accept Assignments."
-        if files[.master] != previousMaster, let master = files[.master] {
-            title = master.deletingPathExtension().lastPathComponent
-            Task { await loadMasterMetadata(from: master) }
-            refreshNativeReadiness()
-        }
     }
 
     private func suggestedRole(for file: URL) -> AudioRole? {
@@ -677,11 +658,31 @@ final class PackagerModel: ObservableObject {
     private func traktorApplicationURL() -> URL? {
         if let runningURL = runningTraktorApplication()?.bundleURL { return runningURL }
         let manager = FileManager.default
-        let candidates = [
+        let applicationFolders = [
+            URL(fileURLWithPath: "/Applications", isDirectory: true),
+            manager.homeDirectoryForCurrentUser.appending(path: "Applications", directoryHint: .isDirectory)
+        ]
+        let directCandidates = [
             URL(fileURLWithPath: "/Applications/Traktor Pro 4.app"),
+            URL(fileURLWithPath: "/Applications/Native Instruments/Traktor Pro 4.app"),
             manager.homeDirectoryForCurrentUser.appending(path: "Applications/Traktor Pro 4.app")
         ]
-        return candidates.first { manager.fileExists(atPath: $0.path) }
+        if let direct = directCandidates.first(where: { manager.fileExists(atPath: $0.path) }) {
+            return direct
+        }
+        for folder in applicationFolders where manager.fileExists(atPath: folder.path) {
+            guard let enumerator = manager.enumerator(
+                at: folder,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles, .skipsPackageDescendants]
+            ) else { continue }
+            for case let candidate as URL in enumerator {
+                if candidate.lastPathComponent.caseInsensitiveCompare("Traktor Pro 4.app") == .orderedSame {
+                    return candidate
+                }
+            }
+        }
+        return nil
     }
 
     func revealOutput() {
