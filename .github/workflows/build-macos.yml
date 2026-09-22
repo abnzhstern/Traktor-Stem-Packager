@@ -33,6 +33,7 @@ jobs:
       - name: Verify lossless PCM round trip
         env:
           STEM_PACKAGER_FFMPEG: macos/Runtime/macos-arm64/ffmpeg
+          STEM_PACKAGER_FFPROBE: macos/Runtime/macos-arm64/ffprobe
         run: node --test test/lossless-roundtrip.test.mjs
 
       - name: Verify Apple AAC 320 CBR encoder

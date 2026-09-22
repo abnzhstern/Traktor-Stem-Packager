@@ -10,7 +10,8 @@ Before testing:
    “Lossless Traktor Installation.”
 4. Choose the collection.nml used by that Traktor installation.
 5. Choose the Stems folder configured in Traktor Pro 4 Preferences.
-6. Add the original master plus the four matching 16-bit/44.1 kHz stems.
+6. Add the original master plus four matching stems. This test build accepts
+   uncompressed PCM WAV/AIFF at 16-bit/44.1 kHz or 24-bit/48 kHz.
 7. Click VERIFY & INSTALL LOSSLESS STEMS and accept the warning.
 8. In Traktor, load the ORIGINAL master track. Do not import the hashed .stem.mp4 directly.
 

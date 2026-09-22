@@ -224,4 +224,6 @@ struct NativePackageResult: Decodable {
     let relativePath: String
     let verification: String
     let verifiedStreams: Int
+    let sampleRate: Int
+    let bitsPerSample: Int
 }

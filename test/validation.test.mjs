@@ -47,4 +47,9 @@ test('lossless mode accepts only explicit 16-bit 44.1 kHz PCM', () => {
     master: { ...pcm, codec: 'aac', bitsPerSample: 0 },
     drums: pcm, bass: pcm, other: pcm, vocals: pcm,
   }), /Compressed or ambiguous sources are rejected/);
+
+  const pcm24 = { codec: 'pcm_s24le', bitsPerSample: 24, sampleRate: 48000 };
+  assert.deepEqual(validateNativeSourceSet({
+    master: pcm24, drums: pcm24, bass: pcm24, other: pcm24, vocals: pcm24,
+  }), { sampleRate: 48000, bitsPerSample: 24 });
 });

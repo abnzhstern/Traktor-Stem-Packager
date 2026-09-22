@@ -54,8 +54,9 @@ async function main() {
   );
   const info = Object.fromEntries(probedEntries);
   const common = validateSet(info);
+  let nativeProfile = null;
   if (mode === 'native-alac') {
-    validateNativeSourceSet(info);
+    nativeProfile = validateNativeSourceSet(info);
   }
 
   console.log(`Validated five stereo tracks: ${common.sampleRate} Hz, ${common.duration.toFixed(3)} seconds`);
@@ -103,6 +104,7 @@ async function main() {
         ffprobe,
         masteringDsp,
         stemNames,
+        audioProfile: nativeProfile,
       });
       console.log('Verified: decoded PCM is bit-for-bit identical for the master and all four stems.');
       console.log(`Installed linked Stem file: ${result.destination}`);

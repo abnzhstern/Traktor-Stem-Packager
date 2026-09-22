@@ -17,7 +17,7 @@ The current build supports **Apple Silicon Macs** running **macOS 14 or newer**.
 - Reads title, artist, album, release date, producer, label, genre, and artwork from the stereo master
 - Lets you edit metadata and stem display names before packaging
 - Portable mode encodes five Apple AudioToolbox AAC streams at 320 kbps CBR and writes Native Instruments Stem metadata
-- Experimental lossless mode accepts only uncompressed 16-bit/44.1 kHz PCM WAV/AIFF sources, stores them as ALAC in Traktor's configured Stems folder, and safely links them to an existing track in `collection.nml`
+- Experimental lossless mode accepts only uncompressed PCM WAV/AIFF sources in a tested profile (16-bit/44.1 kHz or 24-bit/48 kHz), stores them as ALAC in Traktor's configured Stems folder, and safely links them to an existing track in `collection.nml`
 - Decodes and SHA-256 verifies every packaged lossless stream against its source before installation
 - Can ask Traktor to save and quit normally before installation, then relaunch it afterward
 - Measures the unprocessed four-stem sum and enables limiter protection only when needed

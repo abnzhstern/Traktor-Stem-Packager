@@ -181,13 +181,14 @@ function timestamp() {
   return new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
 }
 
-async function decodedPcmSha256(file, streamIndex, ffmpeg) {
+async function decodedPcmSha256(file, streamIndex, ffmpeg, bitsPerSample) {
+  const pcmCodec = bitsPerSample === 24 ? 'pcm_s24le' : 'pcm_s16le';
   const { stdout } = await execFileAsync(ffmpeg, [
     '-hide_banner', '-loglevel', 'error',
     '-i', file,
     '-map', `0:a:${streamIndex}`,
     '-vn', '-sn', '-dn',
-    '-c:a', 'pcm_s16le',
+    '-c:a', pcmCodec,
     '-f', 'hash', '-hash', 'sha256', '-'
   ], { maxBuffer: 1024 * 1024 });
   const match = stdout.match(/SHA256=([a-f0-9]{64})/i);
@@ -195,14 +196,14 @@ async function decodedPcmSha256(file, streamIndex, ffmpeg) {
   return match[1].toLowerCase();
 }
 
-export async function verifyNativePcmRoundTrip({ inputs, packagedFile, ffmpeg }) {
+export async function verifyNativePcmRoundTrip({ inputs, packagedFile, ffmpeg, bitsPerSample = 16 }) {
   const roles = ['master', 'drums', 'bass', 'other', 'vocals'];
   const verified = [];
   for (let index = 0; index < roles.length; index++) {
     const role = roles[index];
     const [sourceHash, packagedHash] = await Promise.all([
-      decodedPcmSha256(inputs[role], 0, ffmpeg),
-      decodedPcmSha256(packagedFile, index, ffmpeg),
+      decodedPcmSha256(inputs[role], 0, ffmpeg, bitsPerSample),
+      decodedPcmSha256(packagedFile, index, ffmpeg, bitsPerSample),
     ]);
     if (sourceHash !== packagedHash) {
       throw new Error(`Lossless verification failed for ${role}: decoded PCM does not match the source.`);
@@ -214,6 +215,7 @@ export async function verifyNativePcmRoundTrip({ inputs, packagedFile, ffmpeg })
 
 export async function createNativeLinkedAlac({
   inputs, collectionPath, stemsDirectory, temporaryDirectory, ffmpeg, ffprobe, masteringDsp, stemNames,
+  audioProfile,
 }) {
   if (await traktorIsRunning()) throw new Error('Quit Traktor Pro 4 before installing linked stems.');
   const collection = await readFile(collectionPath, 'utf8');
@@ -227,7 +229,8 @@ export async function createNativeLinkedAlac({
   const args = ['-hide_banner', '-loglevel', 'error', '-y'];
   for (const role of roles) args.push('-i', inputs[role]);
   for (let index = 0; index < roles.length; index++) args.push('-map', `${index}:a:0`);
-  args.push('-map_metadata', '-1', '-c:a', 'alac', '-sample_fmt', 's16p', '-ar', '44100');
+  const sampleFormat = audioProfile.bitsPerSample === 24 ? 's32p' : 's16p';
+  args.push('-map_metadata', '-1', '-c:a', 'alac', '-sample_fmt', sampleFormat, '-ar', String(audioProfile.sampleRate));
   for (let index = 0; index < roles.length; index++) args.push(`-disposition:a:${index}`, 'default');
   args.push('-brand', 'mp42', '-f', 'mp4', baseFile);
   await execFileAsync(ffmpeg, args, { maxBuffer: 16 * 1024 * 1024 });
@@ -239,15 +242,18 @@ export async function createNativeLinkedAlac({
 
   const { stdout } = await execFileAsync(ffprobe, [
     '-v', 'error', '-select_streams', 'a', '-show_entries',
-    'stream=codec_name,sample_rate,channels,duration_ts', '-of', 'json', finalFile,
+    'stream=codec_name,sample_rate,channels,bits_per_raw_sample,duration_ts', '-of', 'json', finalFile,
   ]);
   const streams = JSON.parse(stdout).streams || [];
   if (streams.length !== 5 || streams.some((stream) =>
-    stream.codec_name !== 'alac' || Number(stream.sample_rate) !== 44100 || Number(stream.channels) !== 2)) {
+    stream.codec_name !== 'alac' || Number(stream.sample_rate) !== audioProfile.sampleRate ||
+    Number(stream.bits_per_raw_sample) !== audioProfile.bitsPerSample || Number(stream.channels) !== 2)) {
     throw new Error('Lossless verification failed before installation.');
   }
 
-  const verifiedPcm = await verifyNativePcmRoundTrip({ inputs, packagedFile: finalFile, ffmpeg });
+  const verifiedPcm = await verifyNativePcmRoundTrip({
+    inputs, packagedFile: finalFile, ffmpeg, bitsPerSample: audioProfile.bitsPerSample,
+  });
 
   const stamp = timestamp();
   const collectionBackup = `${collectionPath}.TraktorStemPackager-${stamp}.bak`;
@@ -284,6 +290,8 @@ export async function createNativeLinkedAlac({
     relativePath,
     verification: 'Decoded PCM is bit-for-bit identical to all five sources.',
     verifiedStreams: verifiedPcm.length,
+    sampleRate: audioProfile.sampleRate,
+    bitsPerSample: audioProfile.bitsPerSample,
   };
 }
 

@@ -140,7 +140,7 @@ struct ContentView: View {
                 title: "Safe Traktor handoff",
                 detail: model.traktorRunning ? "Traktor will save, close, and reopen automatically" : "Traktor is closed and ready"
             )
-            Text("Current verified profile: uncompressed PCM WAV/AIFF, stereo, 16-bit/44.1 kHz. A collection backup is created automatically.")
+            Text("Lossless test profiles: uncompressed stereo PCM WAV/AIFF at 16-bit/44.1 kHz or 24-bit/48 kHz. A collection backup is created automatically.")
                 .font(.system(size: 10))
                 .foregroundStyle(Color.white.opacity(0.4))
         }
