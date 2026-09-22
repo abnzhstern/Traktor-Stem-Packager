@@ -61,6 +61,19 @@ export function validateSet(tracks, toleranceSeconds = 0.001) {
   return { sampleRate: reference.sampleRate, channels: reference.channels, duration: reference.duration };
 }
 
+export function validateNativeSourceSet(tracks) {
+  const allowedPcmCodecs = new Set(['pcm_s16le', 'pcm_s16be']);
+  const incompatible = Object.entries(tracks).filter(([, track]) =>
+    track.sampleRate !== 44100 || track.bitsPerSample !== 16 || !allowedPcmCodecs.has(track.codec));
+  if (!incompatible.length) return;
+  const details = incompatible.map(([name, track]) =>
+    `${name}: ${track.codec || 'unknown codec'}, ${track.bitsPerSample || 'unknown'}-bit, ${track.sampleRate} Hz`).join('; ');
+  throw new Error(
+    'Lossless Traktor Installation currently requires five uncompressed PCM WAV/AIFF files at exactly 16-bit/44.1 kHz. ' +
+    `Compressed or ambiguous sources are rejected. Found: ${details}`,
+  );
+}
+
 export async function encodeAac(input, output, ffmpeg = 'ffmpeg') {
   await execFileAsync(ffmpeg, [
     '-hide_banner', '-loglevel', 'error', '-y',

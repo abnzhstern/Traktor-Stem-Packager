@@ -4,17 +4,20 @@ This is an experimental test build. Do not share it publicly yet.
 
 Before testing:
 1. Import the original stereo master into Traktor Pro 4 and analyze it.
-2. Quit Traktor Pro 4 completely.
-3. Confirm the app title bar says v0.6.0-beta.2, then select
-   “Lossless ALAC (Linked Test).”
+2. Leave Traktor open or close it. If it is open, the app will ask it to save and
+   quit normally before installation, then reopen it afterward.
+3. Confirm the app title bar says v0.6.0-beta.3, then select
+   “Lossless Traktor Installation.”
 4. Choose the collection.nml used by that Traktor installation.
 5. Choose the Stems folder configured in Traktor Pro 4 Preferences.
 6. Add the original master plus the four matching 16-bit/44.1 kHz stems.
-7. Click INSTALL LINKED STEMS and accept the warning.
-8. Reopen Traktor and load the ORIGINAL master track. Do not import the hashed .stem.mp4 directly.
+7. Click VERIFY & INSTALL LOSSLESS STEMS and accept the warning.
+8. In Traktor, load the ORIGINAL master track. Do not import the hashed .stem.mp4 directly.
 
 The app creates a timestamped backup of collection.nml before changing it. If a
 linked stem file already exists for the track, that file is backed up too.
+Before installing, it decodes all five packaged ALAC streams and requires their
+PCM SHA-256 hashes to match the five source files exactly.
 
 For this test, confirm:
 • The linked-stems icon appears beside the original track.

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createProtectiveDsp, validateSet } from '../src/media.mjs';
+import { createProtectiveDsp, validateNativeSourceSet, validateSet } from '../src/media.mjs';
 
 const base = { sampleRate: 48000, channels: 2, duration: 180 };
 
@@ -36,4 +36,15 @@ test('disables dynamics when the stem sum has safe headroom', () => {
   const dsp = createProtectiveDsp({ truePeakDbfs: -1.2 }, -0.3);
   assert.equal(dsp.compressor.enabled, false);
   assert.equal(dsp.limiter.enabled, false);
+});
+
+test('lossless mode accepts only explicit 16-bit 44.1 kHz PCM', () => {
+  const pcm = { codec: 'pcm_s16le', bitsPerSample: 16, sampleRate: 44100 };
+  assert.doesNotThrow(() => validateNativeSourceSet({
+    master: pcm, drums: pcm, bass: pcm, other: pcm, vocals: pcm,
+  }));
+  assert.throws(() => validateNativeSourceSet({
+    master: { ...pcm, codec: 'aac', bitsPerSample: 0 },
+    drums: pcm, bass: pcm, other: pcm, vocals: pcm,
+  }), /Compressed or ambiguous sources are rejected/);
 });

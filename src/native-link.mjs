@@ -98,6 +98,17 @@ function locationCandidates(location) {
 }
 
 export function findCollectionEntry(collectionText, masterPath) {
+  const inspection = inspectCollectionEntry(collectionText, masterPath);
+  if (!inspection.found) {
+    throw new Error('The selected master is not in this Traktor collection. Import and analyze that exact master file first.');
+  }
+  if (!inspection.hasAudioId) {
+    throw new Error('The matching Traktor track has no AUDIO_ID. Analyze the original track in Traktor first.');
+  }
+  return inspection.entry;
+}
+
+export function inspectCollectionEntry(collectionText, masterPath) {
   const target = normalizedPath(masterPath);
   for (const match of collectionText.matchAll(/<ENTRY\b[\s\S]*?<\/ENTRY>/g)) {
     const entryText = match[0];
@@ -105,10 +116,24 @@ export function findCollectionEntry(collectionText, masterPath) {
     if (!location || !locationCandidates(location).includes(target)) continue;
     const entryTag = entryText.match(/^<ENTRY\b[^>]*>/)?.[0];
     const audioId = entryTag ? attributes(entryTag).AUDIO_ID : null;
-    if (!audioId) throw new Error('The matching Traktor track has no AUDIO_ID. Analyze the original track in Traktor first.');
-    return { audioId, entryText, index: match.index };
+    const entry = { audioId, entryText, index: match.index };
+    return {
+      ready: Boolean(audioId),
+      found: true,
+      hasAudioId: Boolean(audioId),
+      message: audioId
+        ? 'Master found and analyzed in the selected Traktor collection.'
+        : 'Master found, but Traktor has not assigned an AUDIO_ID. Analyze it in Traktor first.',
+      entry,
+    };
   }
-  throw new Error('The selected master is not in this Traktor collection. Import and analyze that exact master file first.');
+  return {
+    ready: false,
+    found: false,
+    hasAudioId: false,
+    message: 'This exact master is not in the selected Traktor collection. Import and analyze it in Traktor first.',
+    entry: null,
+  };
 }
 
 export function markEntryHasLinkedStems(collectionText, foundEntry) {
@@ -156,6 +181,37 @@ function timestamp() {
   return new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
 }
 
+async function decodedPcmSha256(file, streamIndex, ffmpeg) {
+  const { stdout } = await execFileAsync(ffmpeg, [
+    '-hide_banner', '-loglevel', 'error',
+    '-i', file,
+    '-map', `0:a:${streamIndex}`,
+    '-vn', '-sn', '-dn',
+    '-c:a', 'pcm_s16le',
+    '-f', 'hash', '-hash', 'sha256', '-'
+  ], { maxBuffer: 1024 * 1024 });
+  const match = stdout.match(/SHA256=([a-f0-9]{64})/i);
+  if (!match) throw new Error(`Could not calculate decoded PCM hash for ${file}.`);
+  return match[1].toLowerCase();
+}
+
+export async function verifyNativePcmRoundTrip({ inputs, packagedFile, ffmpeg }) {
+  const roles = ['master', 'drums', 'bass', 'other', 'vocals'];
+  const verified = [];
+  for (let index = 0; index < roles.length; index++) {
+    const role = roles[index];
+    const [sourceHash, packagedHash] = await Promise.all([
+      decodedPcmSha256(inputs[role], 0, ffmpeg),
+      decodedPcmSha256(packagedFile, index, ffmpeg),
+    ]);
+    if (sourceHash !== packagedHash) {
+      throw new Error(`Lossless verification failed for ${role}: decoded PCM does not match the source.`);
+    }
+    verified.push({ role, sha256: sourceHash });
+  }
+  return verified;
+}
+
 export async function createNativeLinkedAlac({
   inputs, collectionPath, stemsDirectory, temporaryDirectory, ffmpeg, ffprobe, masteringDsp, stemNames,
 }) {
@@ -191,6 +247,8 @@ export async function createNativeLinkedAlac({
     throw new Error('Lossless verification failed before installation.');
   }
 
+  const verifiedPcm = await verifyNativePcmRoundTrip({ inputs, packagedFile: finalFile, ffmpeg });
+
   const stamp = timestamp();
   const collectionBackup = `${collectionPath}.TraktorStemPackager-${stamp}.bak`;
   await copyFile(collectionPath, collectionBackup);
@@ -219,7 +277,14 @@ export async function createNativeLinkedAlac({
     throw error;
   }
 
-  return { destination, collectionBackup, stemBackup, relativePath };
+  return {
+    destination,
+    collectionBackup,
+    stemBackup,
+    relativePath,
+    verification: 'Decoded PCM is bit-for-bit identical to all five sources.',
+    verifiedStreams: verifiedPcm.length,
+  };
 }
 
 export const nativeStemColors = STEM_COLORS;

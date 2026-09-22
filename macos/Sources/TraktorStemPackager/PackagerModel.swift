@@ -29,8 +29,11 @@ final class PackagerModel: ObservableObject {
     ]
     @Published var state: State = .waiting
     @Published var report: ValidationReport?
+    @Published var nativeReadiness: NativeReadiness?
+    @Published var traktorRunning = false
     @Published var statusText = "Add the master and four matching stereo stems."
     private var extractedArtworkURL: URL?
+    private var readinessTask: Task<Void, Never>?
 
     init() {
         let manager = FileManager.default
@@ -50,12 +53,13 @@ final class PackagerModel: ObservableObject {
         }
         let defaultStems = home.appending(path: "Music/Traktor/Stems")
         if manager.fileExists(atPath: defaultStems.path) { stemsDirectoryURL = defaultStems }
+        refreshTraktorStatus()
     }
 
     var hasAllFiles: Bool { AudioRole.allCases.allSatisfy { files[$0] != nil } }
     var canCreate: Bool {
         state == .ready && hasAllFiles &&
-            (mode == .portableAAC || (collectionURL != nil && stemsDirectoryURL != nil))
+            (mode == .portableAAC || (collectionURL != nil && stemsDirectoryURL != nil && nativeReadiness?.ready == true))
     }
 
     func setMode(_ newMode: PackagingMode) {
@@ -63,6 +67,7 @@ final class PackagerModel: ObservableObject {
         report = nil
         state = .waiting
         statusText = hasAllFiles ? "Checking compatibility…" : "Add the remaining audio files."
+        refreshNativeReadiness()
         if hasAllFiles { Task { await validate() } }
     }
 
@@ -74,6 +79,7 @@ final class PackagerModel: ObservableObject {
         if role == .master {
             title = url.deletingPathExtension().lastPathComponent
             Task { await loadMasterMetadata(from: url) }
+            refreshNativeReadiness()
         }
         if hasAllFiles { Task { await validate() } }
     }
@@ -92,6 +98,43 @@ final class PackagerModel: ObservableObject {
             producer = ""
             label = ""
             discardExtractedArtwork()
+            nativeReadiness = nil
+        }
+    }
+
+    func setCollection(_ url: URL?) {
+        collectionURL = url
+        refreshNativeReadiness()
+    }
+
+    func setStemsDirectory(_ url: URL?) {
+        stemsDirectoryURL = url
+    }
+
+    func refreshTraktorStatus() {
+        traktorRunning = runningTraktorApplication() != nil
+    }
+
+    func refreshNativeReadiness() {
+        readinessTask?.cancel()
+        nativeReadiness = nil
+        guard mode == .nativeLossless,
+              let master = files[.master],
+              let collection = collectionURL else { return }
+        readinessTask = Task { [weak self] in
+            do {
+                let result = try await EngineBridge().checkNativeReadiness(master: master, collection: collection)
+                guard !Task.isCancelled,
+                      self?.files[.master] == master,
+                      self?.collectionURL == collection else { return }
+                self?.nativeReadiness = result
+            } catch {
+                guard !Task.isCancelled else { return }
+                self?.nativeReadiness = NativeReadiness(
+                    ready: false, found: false, hasAudioId: false,
+                    message: error.localizedDescription
+                )
+            }
         }
     }
 
@@ -144,8 +187,8 @@ final class PackagerModel: ObservableObject {
             report = result
             state = .ready
             statusText = result.limiterEnabled
-                ? "Compatible. Limiter protection will be embedded for the measured stem sum."
-                : "Compatible. No Stem Master dynamics processing is required."
+                ? String(format: "Compatible. Peak protection enabled: combined peak %.1f dBFS; ceiling −0.3 dBFS.", result.stemSumTruePeakDbfs)
+                : String(format: "Compatible. Protection not needed: combined peak %.1f dBFS.", result.stemSumTruePeakDbfs)
         } catch {
             state = .failed(error.localizedDescription)
             statusText = error.localizedDescription
@@ -195,16 +238,34 @@ final class PackagerModel: ObservableObject {
 
     private func createNativeLossless() async {
         guard let collectionURL, let stemsDirectoryURL else { return }
+        refreshTraktorStatus()
+        let traktor = runningTraktorApplication()
+        let shouldRelaunch = traktor != nil
+        let traktorURL = traktor?.bundleURL
         let warning = NSAlert()
-        warning.messageText = "Install lossless linked stems into Traktor?"
-        warning.informativeText = "Quit Traktor Pro 4 first. The app will back up collection.nml, install the lossless sidecar in the selected Stems folder, and link it to the exact master track."
+        warning.messageText = traktor == nil
+            ? "Verify and install lossless stems?"
+            : "Close Traktor and install lossless stems?"
+        warning.informativeText = traktor == nil
+            ? "The app will verify all five decoded PCM streams, back up collection.nml, install the lossless sidecar, and link it to the exact master track."
+            : "The app will ask Traktor to quit normally so it can save the collection, verify all five decoded PCM streams, install the linked stems, then reopen Traktor."
         warning.alertStyle = .warning
-        warning.addButton(withTitle: "Install Test")
+        warning.addButton(withTitle: traktor == nil ? "Verify & Install" : "Close Traktor & Install")
         warning.addButton(withTitle: "Cancel")
         guard warning.runModal() == .alertFirstButtonReturn else { return }
 
         state = .packaging
-        statusText = "Creating and installing native-linked ALAC stems…"
+        if let traktor {
+            statusText = "Waiting for Traktor to save and close…"
+            do {
+                try await quitTraktorGracefully(traktor)
+            } catch {
+                state = .failed(error.localizedDescription)
+                statusText = error.localizedDescription
+                return
+            }
+        }
+        statusText = "Creating and verifying lossless ALAC streams…"
         do {
             let bridge = try EngineBridge()
             let result = try await bridge.packageNativeLossless(
@@ -219,11 +280,36 @@ final class PackagerModel: ObservableObject {
             }
             let destination = URL(fileURLWithPath: result.destination)
             state = .complete(destination)
-            statusText = "Lossless linked stems installed. Open Traktor and load the original track."
+            statusText = "Installed and verified: all five decoded PCM streams match their sources exactly."
+            if shouldRelaunch, let traktorURL {
+                _ = NSWorkspace.shared.open(traktorURL)
+            }
+            refreshTraktorStatus()
         } catch {
             state = .failed(error.localizedDescription)
             statusText = error.localizedDescription
         }
+    }
+
+    private func runningTraktorApplication() -> NSRunningApplication? {
+        NSWorkspace.shared.runningApplications.first { application in
+            application.localizedName == "Traktor Pro 4" ||
+                application.bundleURL?.lastPathComponent == "Traktor Pro 4.app"
+        }
+    }
+
+    private func quitTraktorGracefully(_ application: NSRunningApplication) async throws {
+        guard application.terminate() else {
+            throw EngineError.failed("Traktor did not accept the quit request. Quit it manually, then try again.")
+        }
+        for _ in 0..<240 {
+            if application.isTerminated {
+                refreshTraktorStatus()
+                return
+            }
+            try await Task.sleep(nanoseconds: 250_000_000)
+        }
+        throw EngineError.failed("Traktor is still open. Finish any save prompts or quit it manually, then try again.")
     }
 
     func revealOutput() {

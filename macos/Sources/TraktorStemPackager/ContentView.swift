@@ -26,12 +26,22 @@ struct ContentView: View {
                 }
                 .padding(16)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .layoutPriority(0)
             footer
+                .fixedSize(horizontal: false, vertical: true)
+                .layoutPriority(10)
         }
-        .frame(minWidth: 760, minHeight: 720)
+        .frame(minWidth: 720, idealWidth: 780, minHeight: 520, idealHeight: 760)
         .background(background)
         .preferredColorScheme(.dark)
         .task { await updateChecker.checkAutomatically() }
+        .task {
+            while !Task.isCancelled {
+                model.refreshTraktorStatus()
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+            }
+        }
         .alert(item: $updateChecker.notice) { notice in
             if notice.offersDownload {
                 return Alert(
@@ -50,22 +60,39 @@ struct ContentView: View {
     }
 
     private var modePanel: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Picker("Output", selection: Binding(
-                get: { model.mode },
-                set: { model.setMode($0) }
-            )) {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("CHOOSE YOUR RESULT")
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(1.0)
+                .foregroundStyle(Color.white.opacity(0.45))
+            HStack(spacing: 10) {
                 ForEach(PackagingMode.allCases) { mode in
-                    Text(mode.title).tag(mode)
+                    Button { model.setMode(mode) } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: mode == .portableAAC ? "shippingbox.fill" : "waveform.badge.checkmark")
+                                .font(.system(size: 19))
+                                .foregroundStyle(model.mode == mode ? Color.white : Color.white.opacity(0.42))
+                                .frame(width: 26)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(mode.title)
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text(mode.subtitle)
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(Color.white.opacity(0.45))
+                                    .lineLimit(1)
+                            }
+                            Spacer(minLength: 4)
+                            Image(systemName: model.mode == mode ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(model.mode == mode ? Color.green : Color.white.opacity(0.2))
+                        }
+                        .padding(11)
+                        .frame(maxWidth: .infinity, minHeight: 58)
+                        .background(model.mode == mode ? Color.white.opacity(0.09) : Color.white.opacity(0.035))
+                        .overlay(Rectangle().stroke(model.mode == mode ? Color.white.opacity(0.2) : Color.white.opacity(0.06)))
+                    }
+                    .buttonStyle(.plain)
                 }
             }
-            .pickerStyle(.segmented)
-
-            Text(model.mode == .portableAAC
-                 ? "Creates a portable five-track .stem.mp4 using Apple AAC at 320 kbps CBR."
-                 : "Experimental: installs 16-bit/44.1 kHz ALAC stems as a sidecar linked to the original track in Traktor Pro 4.")
-                .font(.system(size: 10))
-                .foregroundStyle(Color.white.opacity(0.42))
         }
         .padding(12)
         .background(panel)
@@ -73,28 +100,74 @@ struct ContentView: View {
 
     private var nativeConfigPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("TRAKTOR NATIVE LINK")
+            Text("LOSSLESS INSTALLATION READINESS")
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(1.0)
                 .foregroundStyle(Color.white.opacity(0.45))
+            readinessRow(
+                icon: model.collectionURL == nil ? "1.circle" : "checkmark.circle.fill",
+                color: model.collectionURL == nil ? .orange : .green,
+                title: "Traktor collection",
+                detail: model.collectionURL?.lastPathComponent ?? "Choose collection.nml"
+            )
             pathRow(
-                label: "Collection",
+                label: "Library",
                 url: model.collectionURL,
                 emptyText: "Choose collection.nml",
                 action: chooseCollection
             )
+            readinessRow(
+                icon: model.nativeReadiness?.ready == true ? "checkmark.circle.fill" : "2.circle",
+                color: model.nativeReadiness?.ready == true ? .green : .orange,
+                title: "Original master in Traktor",
+                detail: nativeReadinessMessage
+            )
+            readinessRow(
+                icon: model.stemsDirectoryURL == nil ? "3.circle" : "checkmark.circle.fill",
+                color: model.stemsDirectoryURL == nil ? .orange : .green,
+                title: "Traktor Stems folder",
+                detail: model.stemsDirectoryURL == nil ? "Choose the folder configured in Traktor" : "Ready"
+            )
             pathRow(
-                label: "Stems folder",
+                label: "Folder",
                 url: model.stemsDirectoryURL,
                 emptyText: "Choose Traktor’s configured Stems folder",
                 action: chooseStemsDirectory
             )
-            Text("The selected master must already be imported and analyzed in this collection. Traktor must be closed during installation. A collection backup is created automatically.")
+            readinessRow(
+                icon: model.traktorRunning ? "arrow.clockwise.circle.fill" : "checkmark.circle.fill",
+                color: .green,
+                title: "Safe Traktor handoff",
+                detail: model.traktorRunning ? "Traktor will save, close, and reopen automatically" : "Traktor is closed and ready"
+            )
+            Text("Current verified profile: uncompressed PCM WAV/AIFF, stereo, 16-bit/44.1 kHz. A collection backup is created automatically.")
                 .font(.system(size: 10))
                 .foregroundStyle(Color.white.opacity(0.4))
         }
         .padding(14)
         .background(panel)
+    }
+
+    private var nativeReadinessMessage: String {
+        if model.files[.master] == nil { return "Add the exact stereo master used in Traktor" }
+        if model.collectionURL == nil { return "Choose the Traktor collection first" }
+        return model.nativeReadiness?.message ?? "Checking the selected collection…"
+    }
+
+    private func readinessRow(icon: String, color: Color, title: String, detail: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 9) {
+            Image(systemName: icon)
+                .foregroundStyle(color)
+                .frame(width: 16)
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .frame(width: 150, alignment: .leading)
+            Text(detail)
+                .font(.system(size: 10))
+                .foregroundStyle(Color.white.opacity(0.48))
+                .lineLimit(2)
+            Spacer(minLength: 0)
+        }
     }
 
     private func pathRow(label: String, url: URL?, emptyText: String, action: @escaping () -> Void) -> some View {
@@ -132,10 +205,10 @@ struct ContentView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("v0.6.0-beta.2")
+                Text("v0.6.0-beta.3")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.62))
-                Text("AAC + LOSSLESS ALAC TEST")
+                Text("PORTABLE + VERIFIED LOSSLESS")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.35))
             }
@@ -242,7 +315,7 @@ struct ContentView: View {
 
             if showDetails, let report = model.report {
                 Divider().overlay(Color.white.opacity(0.08))
-                Text("\(report.sampleRate) Hz  •  Stereo  •  \(duration(report.duration))  •  Stem sum \(report.stemSumTruePeakDbfs, specifier: "%.1f") dBFS  •  Compressor off  •  Limiter \(report.limiterEnabled ? "on" : "off")")
+                Text("\(report.sampleRate) Hz  •  Stereo  •  \(duration(report.duration))  •  Stem sum \(report.stemSumTruePeakDbfs, specifier: "%.1f") dBFS  •  Peak protection \(report.limiterEnabled ? "enabled (−0.3 dBFS ceiling)" : "not needed")")
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.45))
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -261,7 +334,7 @@ struct ContentView: View {
             if case .complete = model.state {
                 Button("SHOW IN FINDER") { model.revealOutput() }
             }
-            Button(model.mode == .portableAAC ? "EXPORT STEM.MP4" : "INSTALL LINKED STEMS") {
+            Button(model.mode == .portableAAC ? "CREATE PORTABLE STEM FILE" : "VERIFY & INSTALL LOSSLESS STEMS") {
                 Task { await model.create() }
             }
                 .buttonStyle(.borderedProminent)
@@ -269,7 +342,7 @@ struct ContentView: View {
                 .disabled(!model.canCreate)
         }
         .padding(.horizontal, 16)
-        .frame(height: 55)
+        .frame(minHeight: 58)
         .background(Color(red: 0.14, green: 0.145, blue: 0.16))
     }
 
@@ -293,7 +366,7 @@ struct ContentView: View {
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.message = "Choose Traktor Pro 4 collection.nml"
-        if panel.runModal() == .OK { model.collectionURL = panel.url }
+        if panel.runModal() == .OK { model.setCollection(panel.url) }
     }
 
     private func chooseStemsDirectory() {
@@ -303,7 +376,7 @@ struct ContentView: View {
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true
         panel.message = "Choose the Stems folder configured in Traktor Pro 4"
-        if panel.runModal() == .OK { model.stemsDirectoryURL = panel.url }
+        if panel.runModal() == .OK { model.setStemsDirectory(panel.url) }
     }
 
     private var statusIcon: String {

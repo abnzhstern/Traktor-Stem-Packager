@@ -30,6 +30,11 @@ jobs:
       - name: Prepare private arm64 runtime
         run: macos/scripts/prepare-runtime.sh
 
+      - name: Verify lossless PCM round trip
+        env:
+          STEM_PACKAGER_FFMPEG: macos/Runtime/macos-arm64/ffmpeg
+        run: node --test test/lossless-roundtrip.test.mjs
+
       - name: Verify Apple AAC 320 CBR encoder
         run: |
           FFMPEG="macos/Runtime/macos-arm64/ffmpeg"
@@ -53,9 +58,9 @@ jobs:
           test -f "$APP/Contents/Resources/AppIcon.icns"
           test "$(plutil -extract CFBundleDisplayName raw "$APP/Contents/Info.plist")" = "Traktor Stem Packager"
           test "$(plutil -extract CFBundleIconFile raw "$APP/Contents/Info.plist")" = "AppIcon"
-          test "$(plutil -extract CFBundleShortVersionString raw "$APP/Contents/Info.plist")" = "0.6.0-beta.2"
-          grep -F 'Text("v0.6.0-beta.2")' macos/Sources/TraktorStemPackager/ContentView.swift
-          grep -F 'case .nativeLossless: "Lossless ALAC (Linked Test)"' macos/Sources/TraktorStemPackager/AudioRole.swift
+          test "$(plutil -extract CFBundleShortVersionString raw "$APP/Contents/Info.plist")" = "0.6.0-beta.3"
+          grep -F 'Text("v0.6.0-beta.3")' macos/Sources/TraktorStemPackager/ContentView.swift
+          grep -F 'case .nativeLossless: "Lossless Traktor Installation"' macos/Sources/TraktorStemPackager/AudioRole.swift
           codesign --verify --deep --strict "$APP"
           file "$APP/Contents/MacOS/TraktorStemPackager" | grep arm64
           file "$APP/Contents/Resources/Runtime/node" | grep arm64
@@ -72,15 +77,15 @@ jobs:
           cp "macos/installer/README.txt" "$DIST/"
           cp "macos/installer/LOSSLESS-TEST-NOTES.txt" "$DIST/"
           chmod +x "$DIST/Install Traktor Stem Packager.command"
-          ditto -c -k --sequesterRsrc --keepParent "$DIST" "Traktor-Stem-Packager-0.6.0-beta.2-dual-mode-test.zip"
-          shasum -a 256 "Traktor-Stem-Packager-0.6.0-beta.2-dual-mode-test.zip" > "Traktor-Stem-Packager-0.6.0-beta.2-dual-mode-test.zip.sha256"
+          ditto -c -k --sequesterRsrc --keepParent "$DIST" "Traktor-Stem-Packager-0.6.0-beta.3-dual-mode-test.zip"
+          shasum -a 256 "Traktor-Stem-Packager-0.6.0-beta.3-dual-mode-test.zip" > "Traktor-Stem-Packager-0.6.0-beta.3-dual-mode-test.zip.sha256"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Traktor-Stem-Packager-0.6.0-beta.2-dual-mode-test
+          name: Traktor-Stem-Packager-0.6.0-beta.3-dual-mode-test
           path: |
-            Traktor-Stem-Packager-0.6.0-beta.2-dual-mode-test.zip
-            Traktor-Stem-Packager-0.6.0-beta.2-dual-mode-test.zip.sha256
+            Traktor-Stem-Packager-0.6.0-beta.3-dual-mode-test.zip
+            Traktor-Stem-Packager-0.6.0-beta.3-dual-mode-test.zip.sha256
           if-no-files-found: error
           retention-days: 14

@@ -10,7 +10,7 @@ struct TraktorStemPackagerApp: App {
             ContentView()
                 .environmentObject(model)
                 .environmentObject(updateChecker)
-                .frame(minWidth: 720, minHeight: 650)
+                .frame(minWidth: 720, minHeight: 520)
         }
         .windowResizability(.contentSize)
         .commands {

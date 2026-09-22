@@ -8,8 +8,14 @@ enum PackagingMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .portableAAC: "Portable AAC 320 CBR"
-        case .nativeLossless: "Lossless ALAC (Linked Test)"
+        case .portableAAC: "Portable Stem File"
+        case .nativeLossless: "Lossless Traktor Installation"
+        }
+    }
+    var subtitle: String {
+        switch self {
+        case .portableAAC: "One shareable .stem.mp4 file • AAC 320 kbps"
+        case .nativeLossless: "Preserves source PCM • Installs directly into Traktor"
         }
     }
     var commandName: String {
@@ -61,4 +67,11 @@ struct ValidationReport: Decodable {
     let compressorEnabled: Bool
     let limiterEnabled: Bool
     let limiterCeilingDbfs: Double
+}
+
+struct NativeReadiness: Decodable {
+    let ready: Bool
+    let found: Bool
+    let hasAudioId: Bool
+    let message: String
 }

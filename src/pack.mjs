@@ -4,7 +4,7 @@ import { basename, extname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { mkdtemp } from 'node:fs/promises';
 import { StemMp4Writer } from 'stem-mp4';
-import { analyzeStemSum, createProtectiveDsp, encodeAac, probeAudio, validateSet } from './media.mjs';
+import { analyzeStemSum, createProtectiveDsp, encodeAac, probeAudio, validateNativeSourceSet, validateSet } from './media.mjs';
 import { readMasterMetadata } from './metadata.mjs';
 import { createNativeLinkedAlac } from './native-link.mjs';
 
@@ -55,11 +55,7 @@ async function main() {
   const info = Object.fromEntries(probedEntries);
   const common = validateSet(info);
   if (mode === 'native-alac') {
-    const incompatible = Object.entries(info).filter(([, track]) =>
-      track.sampleRate !== 44100 || (track.bitsPerSample && track.bitsPerSample !== 16));
-    if (incompatible.length) {
-      throw new Error('Lossless linked mode currently requires five matching stereo 16-bit/44.1 kHz sources.');
-    }
+    validateNativeSourceSet(info);
   }
 
   console.log(`Validated five stereo tracks: ${common.sampleRate} Hz, ${common.duration.toFixed(3)} seconds`);
@@ -71,7 +67,7 @@ async function main() {
   const masteringDsp = createProtectiveDsp(sumAnalysis);
   console.log(
     `Stem sum: ${sumAnalysis.integratedLufs.toFixed(1)} LUFS, ${sumAnalysis.truePeakDbfs.toFixed(1)} dBFS true peak; ` +
-    `compressor off, limiter ${masteringDsp.limiter.enabled ? 'on' : 'off'}.`,
+    `peak protection ${masteringDsp.limiter.enabled ? 'on' : 'not needed'}.`,
   );
   if (validateOnly) {
     console.log(`VALIDATION_RESULT ${JSON.stringify({
@@ -108,6 +104,7 @@ async function main() {
         masteringDsp,
         stemNames,
       });
+      console.log('Verified: decoded PCM is bit-for-bit identical for the master and all four stems.');
       console.log(`Installed linked Stem file: ${result.destination}`);
       console.log(`Collection backup: ${result.collectionBackup}`);
       console.log(`NATIVE_RESULT ${JSON.stringify(result)}`);

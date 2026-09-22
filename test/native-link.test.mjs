@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   findCollectionEntry,
+  inspectCollectionEntry,
   markEntryHasLinkedStems,
   nativeStemRelativePath,
 } from '../src/native-link.mjs';
@@ -17,6 +18,18 @@ test('derives Traktor native path from AUDIO_ID', () => {
     nativeStemRelativePath(goodVibrationsAudioId),
     '056/YNB5YZACIWLCQDMCDFGUDOYEB45D.stem.mp4',
   );
+});
+
+test('reports collection readiness without mutating the collection', () => {
+  const unanalyzed = '<NML><COLLECTION><ENTRY><LOCATION DIR="/:Users/:andrew/:Music/:" FILE="x.aif"/></ENTRY></COLLECTION></NML>';
+  const missingId = inspectCollectionEntry(unanalyzed, '/Users/andrew/Music/x.aif');
+  assert.equal(missingId.found, true);
+  assert.equal(missingId.ready, false);
+  assert.equal(missingId.hasAudioId, false);
+
+  const absent = inspectCollectionEntry(unanalyzed, '/Users/andrew/Music/y.aif');
+  assert.equal(absent.found, false);
+  assert.equal(absent.ready, false);
 });
 
 test('finds the exact master and sets linked-stem flag without disturbing other flags', () => {

@@ -27,15 +27,29 @@ struct EngineBridge {
     private var ffprobe: URL { resources.appending(path: "Runtime/ffprobe") }
     private var engine: URL { resources.appending(path: "Engine/src/pack.mjs") }
     private var metadataEngine: URL { resources.appending(path: "Engine/src/read-metadata.mjs") }
+    private var nativeCheckEngine: URL { resources.appending(path: "Engine/src/check-native.mjs") }
 
     private func requireComponents() throws {
         let manager = FileManager.default
-        for (url, name) in [(node, "Node runtime"), (ffmpeg, "encoder"), (ffprobe, "media inspector"), (engine, "packaging engine"), (metadataEngine, "metadata reader")] {
-            let isScript = name == "packaging engine" || name == "metadata reader"
+        for (url, name) in [(node, "Node runtime"), (ffmpeg, "encoder"), (ffprobe, "media inspector"), (engine, "packaging engine"), (metadataEngine, "metadata reader"), (nativeCheckEngine, "Traktor collection checker")] {
+            let isScript = name == "packaging engine" || name == "metadata reader" || name == "Traktor collection checker"
             guard manager.isExecutableFile(atPath: url.path) || (isScript && manager.fileExists(atPath: url.path)) else {
                 throw EngineError.missingComponent(name)
             }
         }
+    }
+
+    func checkNativeReadiness(master: URL, collection: URL) async throws -> NativeReadiness {
+        try requireComponents()
+        let result = try await execute(
+            arguments: [nativeCheckEngine.path, "--master", master.path, "--collection", collection.path],
+            progress: nil
+        )
+        guard let marker = result.split(separator: "\n").first(where: { $0.hasPrefix("NATIVE_READINESS_RESULT ") }) else {
+            throw EngineError.invalidResponse
+        }
+        let json = marker.dropFirst("NATIVE_READINESS_RESULT ".count)
+        return try JSONDecoder().decode(NativeReadiness.self, from: Data(json.utf8))
     }
 
     func readMasterMetadata(master: URL) async throws -> MasterMetadata {
@@ -208,4 +222,6 @@ struct NativePackageResult: Decodable {
     let collectionBackup: String
     let stemBackup: String?
     let relativePath: String
+    let verification: String
+    let verifiedStreams: Int
 }
