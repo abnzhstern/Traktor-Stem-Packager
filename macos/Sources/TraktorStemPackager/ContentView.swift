@@ -88,17 +88,37 @@ struct ContentView: View {
             Spacer(minLength: 0)
             if model.mode == .nativeLossless,
                model.files[.master] != nil,
-               model.nativeReadiness?.ready != true,
+               model.nativeReadiness?.ready == false,
                model.state != .packaging {
                 VStack(alignment: .trailing, spacing: 6) {
-                    Button("SEND MASTER TO TRAKTOR") { model.sendMasterToTraktor() }
+                    if model.automaticImportSetupInProgress {
+                        Button("SETUP COMPLETE — IMPORT MASTER") {
+                            Task { await model.completeAutomaticImportSetupAndImport() }
+                        }
                         .font(.system(size: 9, weight: .semibold))
                         .buttonStyle(.borderedProminent)
-                    Button("CHECK TRAKTOR AGAIN") {
-                        Task { await model.checkTraktorForMaster() }
+                        Button("CANCEL SETUP") { model.cancelAutomaticImportSetup() }
+                            .font(.system(size: 9, weight: .semibold))
+                            .buttonStyle(.bordered)
+                    } else {
+                        Button("GUIDED DRAG") { model.openTraktorAndRevealMaster() }
+                            .font(.system(size: 9, weight: .semibold))
+                            .buttonStyle(.borderedProminent)
+                        Button(model.automaticImportConfigured ? "AUTOMATIC IMPORT" : "SET UP AUTOMATIC IMPORT") {
+                            if model.automaticImportConfigured {
+                                Task { await model.importMasterAutomatically() }
+                            } else {
+                                model.beginAutomaticImportSetup()
+                            }
+                        }
+                        .font(.system(size: 9, weight: .semibold))
+                        .buttonStyle(.bordered)
+                        Button("CHECK TRAKTOR AGAIN") {
+                            Task { await model.checkTraktorForMaster() }
+                        }
+                        .font(.system(size: 9, weight: .semibold))
+                        .buttonStyle(.plain)
                     }
-                    .font(.system(size: 9, weight: .semibold))
-                    .buttonStyle(.bordered)
                 }
             }
         }
@@ -129,7 +149,7 @@ struct ContentView: View {
             if !model.hasAllFiles {
                 return ("STEP 1", "Add your master and four stem files, or import a five-file folder.", "1.circle.fill", .blue)
             }
-            return ("STEP 2", "Review the imported metadata, then click CREATE AAC STEM FILE.", "2.circle.fill", .green)
+            return ("STEP 2", "Review the metadata, then create the AAC Stem file. Drag the finished .stem.mp4 directly into Traktor; all four stems will be present.", "2.circle.fill", .green)
         }
 
         if model.files[.master] == nil {
@@ -142,10 +162,13 @@ struct ContentView: View {
             return ("CHECKING TRAKTOR", "Checking the master against Traktor’s saved collection…", "magnifyingglass.circle.fill", .blue)
         }
         if model.nativeReadiness?.ready == false {
-            if model.traktorRunning {
-                return ("STEP 3", "In Traktor, analyze the master. Then return and choose Check Traktor Again. If it is not found, use Save, Close Traktor & Continue.", "3.circle.fill", .orange)
+            if model.automaticImportSetupInProgress {
+                return ("ONE-TIME SETUP", "In Traktor Preferences > File Management, add the revealed folder under Music Folders. Enable Analyze new imported tracks and Import Music Folders at Startup. Then return here and choose Setup Complete — Import Master.", "gearshape.fill", .orange)
             }
-            return ("STEP 3", "Choose Send Master to Traktor. Analyze it there, then return and choose Check Traktor Again.", "3.circle.fill", .blue)
+            if model.traktorRunning {
+                return ("STEP 3", "If the master is already in Traktor, let analysis finish. Then check again; if it is still not found, quit Traktor normally so it saves the collection.", "3.circle.fill", .orange)
+            }
+            return ("STEP 3", "This exact master is not in Traktor yet. Use Guided Drag for the most reliable one-time import, or set up Automatic Import for repeated use.", "3.circle.fill", .blue)
         }
         if !model.hasAllFiles {
             return ("STEP 4", "The analyzed master was found. Add the remaining four stems or import their five-file folder.", "4.circle.fill", .blue)
@@ -187,12 +210,12 @@ struct ContentView: View {
             guideRow(
                 icon: "shippingbox.fill",
                 title: "AAC Stem File",
-                detail: "The easiest workflow. No Traktor preparation is required. Add the stereo master and four matching stems, then create one shareable 320 kbps AAC Stem file."
+                detail: "The easiest workflow. No Traktor preparation is required. Create one shareable 320 kbps AAC .stem.mp4, then drag that finished file directly into Traktor. Its four stems are already packaged inside."
             )
             guideRow(
                 icon: "waveform.badge.checkmark",
                 title: "Lossless Traktor Installation",
-                detail: "Add the exact stereo master here, then use Send Master to Traktor. Analyze it in Traktor and return. The app checks the saved track ID, verifies the stems, and guides you through closing Traktor only when required."
+                detail: "Add the exact stereo master. The app checks Traktor first and skips importing if it is already analyzed. Otherwise use reliable Guided Drag, or complete the clearly marked one-time setup for Automatic Import."
             )
 
             Text("Important: use the same master file in both Traktor and this app. A different copy may create a separate library entry and will not inherit the original track’s cues or beat grid.")
@@ -349,7 +372,7 @@ struct ContentView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("v0.6.0-beta.8")
+                Text("v0.6.0-beta.9")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.62))
                 Text("AAC + VERIFIED LOSSLESS")

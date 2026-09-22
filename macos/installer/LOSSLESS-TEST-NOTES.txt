@@ -6,13 +6,14 @@ This app does not create or separate stems. Start with four stems you already
 created or received, plus the matching stereo master.
 
 Before testing:
-1. Confirm the app title bar says v0.6.0-beta.8, then select
+1. Confirm the app title bar says v0.6.0-beta.9, then select
    “Lossless Traktor Installation.”
 2. Choose the collection.nml used by that Traktor installation.
 3. Choose the Stems folder configured in Traktor Pro 4 Preferences.
-4. Add the original master. Choose SEND MASTER TO TRAKTOR, analyze the track in
-   Traktor, then return and choose CHECK TRAKTOR AGAIN. If the master was already
-   analyzed, add it here and choose CHECK TRAKTOR AGAIN directly.
+4. Add the original master. The app checks Traktor first. If it is already
+   analyzed, import is skipped. Otherwise choose GUIDED DRAG, or follow the
+   in-app one-time setup for AUTOMATIC IMPORT. Let analysis finish, then return
+   and choose CHECK TRAKTOR AGAIN. Traktor may need to quit normally to save it.
 5. Add the four matching stems. This test build accepts
    uncompressed PCM WAV/AIFF at 16-bit/44.1 kHz or 24-bit/48 kHz.
    You can also choose IMPORT FOLDER, review the proposed assignments, drag

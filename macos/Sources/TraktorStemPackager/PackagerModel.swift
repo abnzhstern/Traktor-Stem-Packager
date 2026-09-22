@@ -36,12 +36,15 @@ final class PackagerModel: ObservableObject {
     @Published var validationProblemRoles: Set<AudioRole> = []
     @Published var folderImportNeedsReview = false
     @Published var waitingForManualTraktorQuit = false
+    @Published var automaticImportConfigured: Bool
+    @Published var automaticImportSetupInProgress = false
     private var extractedArtworkURL: URL?
     private var readinessTask: Task<Void, Never>?
 
     init() {
         let manager = FileManager.default
         let home = manager.homeDirectoryForCurrentUser
+        automaticImportConfigured = UserDefaults.standard.bool(forKey: "automaticTraktorImportConfigured")
         let nativeInstruments = home.appending(path: "Documents/Native Instruments")
         if let folders = try? manager.contentsOfDirectory(
             at: nativeInstruments,
@@ -61,6 +64,10 @@ final class PackagerModel: ObservableObject {
     }
 
     var hasAllFiles: Bool { AudioRole.allCases.allSatisfy { files[$0] != nil } }
+    var automaticImportDirectory: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appending(path: "Music/Traktor Stem Packager Masters", directoryHint: .isDirectory)
+    }
     var audioSetValidated: Bool {
         guard hasAllFiles, report != nil else { return false }
         switch state {
@@ -330,7 +337,7 @@ final class PackagerModel: ObservableObject {
                 recoveryText = "After analysis finishes, return here and choose Check Traktor Again. If it is still not found, use Save, Close Traktor & Continue."
             } else {
                 statusText = result.message
-                recoveryText = "Choose Send Master to Traktor, analyze that exact file, then return here and check again."
+                recoveryText = "Choose the guided drag or automatic-import option below. After Traktor analyzes the exact master and saves its collection, check again."
             }
         } catch {
             nativeReadiness = NativeReadiness(ready: false, found: false, hasAudioId: false, message: error.localizedDescription)
@@ -339,10 +346,10 @@ final class PackagerModel: ObservableObject {
         }
     }
 
-    func sendMasterToTraktor() {
+    func openTraktorAndRevealMaster() {
         guard let master = files[.master] else {
             statusText = "Add the stereo master first."
-            recoveryText = "Drop or choose the exact master file, then choose Send Master to Traktor."
+            recoveryText = "Drop or choose the exact master file, then use one of the Traktor import options."
             return
         }
         guard let traktorURL = traktorApplicationURL() else {
@@ -351,23 +358,128 @@ final class PackagerModel: ObservableObject {
             recoveryText = "Open Traktor manually and import this exact master, or move Traktor Pro 4.app into the Applications folder."
             return
         }
-        recoveryText = nil
-        statusText = "Opening this exact master in Traktor…"
+        statusText = "Opening Traktor and highlighting the exact master in Finder…"
+        recoveryText = "Drag the highlighted file from Finder into Traktor’s Track Collection or a deck. Dismiss any Traktor startup window first, then let analysis finish."
         let configuration = NSWorkspace.OpenConfiguration()
-        NSWorkspace.shared.open([master], withApplicationAt: traktorURL, configuration: configuration) { [weak self] _, error in
+        configuration.activates = true
+        NSWorkspace.shared.openApplication(at: traktorURL, configuration: configuration) { [weak self] _, error in
             Task { @MainActor in
                 guard let self else { return }
                 self.refreshTraktorStatus()
                 if let error {
-                    self.state = .failed("Traktor could not open the selected master: \(error.localizedDescription)")
-                    self.statusText = "Traktor could not open the selected master."
-                    self.recoveryText = "Open Traktor manually, import this exact master, analyze it, then return and choose Check Traktor Again."
+                    self.state = .failed("Traktor could not be opened: \(error.localizedDescription)")
+                    self.statusText = "Traktor could not be opened."
+                    self.recoveryText = "Open Traktor manually, drag in this exact master, analyze it, then return and choose Check Traktor Again."
                 } else {
-                    self.statusText = "Master sent to Traktor. Analyze it there, then return and choose Check Traktor Again."
-                    self.recoveryText = "If Traktor analyzes imports automatically, wait for analysis to finish. Otherwise choose Analyze in Traktor."
+                    NSWorkspace.shared.activateFileViewerSelecting([master])
+                    self.statusText = "Traktor is open and your master is highlighted in Finder. Drag it into Traktor now."
+                    self.recoveryText = "Drop it into Traktor’s Track Collection or a deck. Let analysis finish, then return here and choose Check Traktor Again."
                 }
             }
         }
+    }
+
+    func beginAutomaticImportSetup() {
+        do {
+            try FileManager.default.createDirectory(at: automaticImportDirectory, withIntermediateDirectories: true)
+            automaticImportSetupInProgress = true
+            statusText = "Complete the one-time Automatic Import setup shown here."
+            recoveryText = "In Traktor: Preferences > File Management. Add the revealed folder under Music Folders, enable Analyze new imported tracks, and enable Import Music Folders at Startup. Then return here and choose Setup Complete — Import Master."
+            NSWorkspace.shared.activateFileViewerSelecting([automaticImportDirectory])
+            if let traktorURL = traktorApplicationURL() {
+                _ = NSWorkspace.shared.open(traktorURL)
+            }
+        } catch {
+            state = .failed("The Automatic Import folder could not be created.")
+            statusText = "The Automatic Import folder could not be created."
+            recoveryText = error.localizedDescription
+        }
+    }
+
+    func cancelAutomaticImportSetup() {
+        automaticImportSetupInProgress = false
+        statusText = "Choose Guided Drag or Automatic Import for this master."
+        recoveryText = nil
+    }
+
+    func completeAutomaticImportSetupAndImport() async {
+        UserDefaults.standard.set(true, forKey: "automaticTraktorImportConfigured")
+        automaticImportConfigured = true
+        automaticImportSetupInProgress = false
+        await importMasterAutomatically()
+    }
+
+    func importMasterAutomatically() async {
+        guard let master = files[.master] else {
+            statusText = "Add the stereo master first."
+            recoveryText = "Drop or choose the exact master file, then choose Automatic Import."
+            return
+        }
+        guard let traktorURL = traktorApplicationURL() else {
+            state = .failed("Traktor Pro 4 could not be found in Applications.")
+            statusText = "Traktor Pro 4 could not be found in Applications."
+            recoveryText = "Open Traktor manually and use Guided Drag, or move Traktor Pro 4.app into Applications or one of its subfolders."
+            return
+        }
+
+        do {
+            try FileManager.default.createDirectory(at: automaticImportDirectory, withIntermediateDirectories: true)
+            let importedMaster = try persistentAutomaticImportCopy(of: master)
+            files[.master] = importedMaster
+            if title.isEmpty { title = importedMaster.deletingPathExtension().lastPathComponent }
+            refreshNativeReadiness()
+
+            if let running = runningTraktorApplication() {
+                let prompt = NSAlert()
+                prompt.messageText = "Restart Traktor to import the master?"
+                prompt.informativeText = "Automatic Import runs when Traktor starts. Choose I’ll Quit Traktor to avoid the macOS App Management permission, or Close Automatically for convenience."
+                prompt.alertStyle = .informational
+                prompt.addButton(withTitle: "I’ll Quit Traktor")
+                prompt.addButton(withTitle: "Close Automatically")
+                prompt.addButton(withTitle: "Cancel")
+                let choice = prompt.runModal()
+                guard choice != .alertThirdButtonReturn else { return }
+                state = .packaging
+                let closed = await closeTraktorOrWaitForUser(running, automatically: choice == .alertSecondButtonReturn)
+                guard closed else { return }
+            }
+
+            statusText = "Starting Traktor. It will import and analyze the master from the configured Music Folder."
+            recoveryText = "Dismiss any Traktor startup or confirmation window. When analysis finishes, quit Traktor normally so it saves the track ID; this app will check it automatically. Keep the master in the Automatic Import folder—Traktor links to that copy."
+            guard NSWorkspace.shared.open(traktorURL) else {
+                throw NSError(
+                    domain: "TraktorStemPackager",
+                    code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "macOS could not launch Traktor Pro 4."]
+                )
+            }
+            refreshTraktorStatus()
+            state = report != nil && hasAllFiles ? .ready : .waiting
+        } catch {
+            state = .failed("The master could not be prepared for Automatic Import: \(error.localizedDescription)")
+            statusText = "The master could not be prepared for Automatic Import."
+            recoveryText = "Check that your Music folder is writable, then try again or use Guided Drag."
+        }
+    }
+
+    private func persistentAutomaticImportCopy(of source: URL) throws -> URL {
+        let manager = FileManager.default
+        let sourceURL = source.standardizedFileURL
+        let folderURL = automaticImportDirectory.standardizedFileURL
+        if sourceURL.deletingLastPathComponent() == folderURL { return sourceURL }
+
+        let base = sourceURL.deletingPathExtension().lastPathComponent
+        let ext = sourceURL.pathExtension
+        var destination = folderURL.appending(path: sourceURL.lastPathComponent)
+        var suffix = 2
+        while manager.fileExists(atPath: destination.path) {
+            if manager.contentsEqual(atPath: sourceURL.path, andPath: destination.path) { return destination }
+            let name = ext.isEmpty ? "\(base) \(suffix)" : "\(base) \(suffix).\(ext)"
+            destination = folderURL.appending(path: name)
+            suffix += 1
+        }
+        try manager.copyItem(at: sourceURL, to: destination)
+        return destination
     }
 
     func setArtwork(_ url: URL?) {
@@ -492,8 +604,8 @@ final class PackagerModel: ObservableObject {
                 }
             }
             state = .complete(destination)
-            statusText = "Traktor Stem file created successfully."
-            recoveryText = nil
+            statusText = "AAC Stem file created. Drag the finished .stem.mp4 directly into Traktor; all four stems are already inside."
+            recoveryText = "Choose Show in Finder, then drag the .stem.mp4 into Traktor’s Track Collection or a deck."
         } catch {
             state = .failed(error.localizedDescription)
             statusText = error.localizedDescription

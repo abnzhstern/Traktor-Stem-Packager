@@ -6,6 +6,10 @@ WHAT THIS APP IS
 
 Traktor Stem Packager does not create or separate stems. It packages four stems you already created or received from a producer, composer, label, or stem-separation service, together with the matching stereo master.
 
+AAC STEM FILE WORKFLOW
+
+The AAC workflow creates one shareable .stem.mp4 file. Drag that finished .stem.mp4 directly into Traktor's Track Collection or a deck; the four packaged stems will be present automatically. No master-track analysis or linked-folder setup is required for this workflow.
+
 Files can be added individually, or Import Folder can propose assignments from a folder containing exactly five supported audio files. Always review the proposed assignments before accepting them. Drag a file onto another slot to reassign it. Accepted assignments lock; choose Edit Assignments to change them. Clear All empties the queue without deleting source files.
 
 IMPORTANT
@@ -53,7 +57,9 @@ Because this free build is not signed and notarized through Apple's Developer Pr
 
 LOSSLESS TRAKTOR HANDOFF
 
-The lossless workflow can send the selected master to Traktor and guide you through analysis. Traktor itself creates the analysis ID; if automatic analysis is disabled, choose Analyze inside Traktor.
+The lossless workflow checks Traktor's collection first. If the exact master is already analyzed, the import step is skipped.
+
+If it is not present, Guided Drag opens Traktor and highlights the exact master in Finder so you can drag it into Traktor. Automatic Import is an optional repeated-use workflow. The app explains its one-time Traktor Preferences setup on screen, creates a permanent Music Folder for imported masters, and starts Traktor so it can import and analyze the track at launch. Keep those copied masters in that folder because Traktor links to them there.
 
 Traktor must close before the app edits collection.nml. At that step you can choose:
 • I’ll Quit Traktor — avoids the macOS App Management permission. Quit Traktor normally and the app will detect it and continue automatically.
