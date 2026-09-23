@@ -22,9 +22,9 @@ The current build supports **Apple Silicon Macs** running **macOS 14 or newer**.
 - The AAC Stem File workflow creates one easy-to-share `.stem.mp4` using five Apple AudioToolbox AAC streams at 320 kbps CBR and writes Native Instruments Stem metadata
 - Experimental lossless mode accepts only uncompressed PCM WAV/AIFF sources in a tested profile (16-bit/44.1 kHz or 24-bit/48 kHz), stores them as ALAC in Traktor's configured Stems folder, and safely links them to an existing track in `collection.nml`
 - Decodes and SHA-256 verifies every packaged lossless stream against its source before installation
-- Can ask Traktor to save and quit normally before installation, then relaunch it afterward
+- Can close Traktor so it saves its collection before installation, then relaunch it afterward; if macOS blocks automatic closing, the app provides a clear permission path and manual fallback
 - Sends the exact selected master to Traktor, checks for its saved analysis ID, and always states the next required action
-- Waits for the user to quit Traktor normally, avoiding App Management permission prompts
+- Rechecks Traktor automatically after closure; the internal collection check is not exposed as a confusing workflow button
 - Preserves the existing Traktor library entry so its cues, beat grid, loops, and other track data remain attached
 - Provides Clear All, drag-and-drop reassignment, accepted-assignment locking, and Edit Assignments
 - Opens with a workflow guide explaining what the app does and walking through the selected workflow; users can choose **Don't Show Again** and reopen it later with **How It Works**
@@ -75,7 +75,7 @@ macos/scripts/build-app.sh
 
 The completed app is written to `macos/build/Traktor Stem Packager.app`.
 
-The AAC Stem File workflow is the shareable standalone `.stem.mp4` option. Lossless ALAC is an experimental linked mode: Traktor must analyze the exact original master, and the app creates a timestamped collection backup before making the link. The app reveals the master for import into Traktor's Track Collection and verifies the saved ID. If Traktor is open at installation time, the app asks the user to quit it normally, waits for the saved collection, and continues automatically.
+The AAC Stem File workflow is the shareable standalone `.stem.mp4` option. Lossless ALAC is an experimental linked mode: Traktor must analyze the exact original master, and the app creates a timestamped collection backup before making the link. The app reveals the master for import into Traktor's Track Collection and verifies the saved ID. If Traktor is open at installation time, the app asks Traktor to close, waits for the saved collection, continues automatically, and relaunches Traktor. A manual fallback is shown if macOS blocks automatic closing.
 
 The command-line packaging engine can also be run directly:
 

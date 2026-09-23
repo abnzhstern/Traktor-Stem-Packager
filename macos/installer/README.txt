@@ -59,8 +59,14 @@ LOSSLESS TRAKTOR HANDOFF
 
 The lossless workflow checks Traktor's collection first. If the exact master is already analyzed, the import step is skipped.
 
-If it is not present, choose Drag Stereo Master into Traktor. The app opens Traktor and brings Finder to the foreground with the exact master highlighted. Drag it into Traktor's Track Collection, not onto a deck, and let analysis finish. A Show Master in Finder button remains available if you need to reveal it again. Return to the app and choose Save, Quit Traktor & Install.
+Start by adding the exact stereo master to the app. You may add the four stems at the same time, individually or with Import Folder, or add them later. If the master is not already analyzed, choose Open Traktor & Show Master. The app opens Traktor and brings Finder to the foreground with the exact master highlighted. Drag it into Traktor's Track Collection, not onto a deck, and let analysis finish. Show Master in Finder remains available whenever a master is loaded.
 
 If linked stems already exist for that master, the app asks before replacing them. A timestamped .bak file is a safety backup of the previous linked Stem file, not a second active Stem set.
 
-Traktor must close before the app edits collection.nml. Quit Traktor normally when prompted. The app detects the closure and continues automatically without requesting permission to close another app. Traktor may briefly say Updating Settings while saving its collection; that is expected.
+Traktor must close before the app edits collection.nml. Follow the orange next-action button. The app asks Traktor to close, verifies the saved analysis, installs the stems, and reopens Traktor. Traktor may briefly say Updating Settings while saving its collection; that is expected.
+
+MAC PRIVACY & SECURITY
+
+This free build is not Apple-notarized. If macOS blocks the app from closing Traktor, open System Settings > Privacy & Security and allow Traktor Stem Packager under Automation if it appears. The app's How It Works page includes a button that opens Privacy & Security. If permission remains unavailable, the app pauses and walks you through quitting Traktor manually, then continues automatically.
+
+App Management permission for Terminal or the installer is separate. It is needed only when installing or replacing Traktor Stem Packager in the Applications folder. Manually closing Traktor does not affect that installation notice.

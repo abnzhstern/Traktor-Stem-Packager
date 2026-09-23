@@ -88,31 +88,28 @@ struct ContentView: View {
             Spacer(minLength: 0)
             if model.mode == .nativeLossless,
                model.files[.master] != nil,
-               model.nativeReadiness?.ready == false,
                model.state != .packaging {
                 VStack(alignment: .trailing, spacing: 6) {
-                    if model.traktorRunning {
-                        Button(model.canResolveUnsavedAnalysis ? "SAVE, QUIT TRAKTOR & INSTALL" : "SAVE & QUIT TRAKTOR") {
-                            if model.canResolveUnsavedAnalysis {
-                                Task { await model.create() }
-                            } else {
-                                Task { await model.saveAndQuitAfterAnalysis() }
+                    if model.nativeReadiness?.ready == false {
+                        if model.traktorRunning {
+                            Button(model.canResolveUnsavedAnalysis ? "CLOSE TRAKTOR & INSTALL" : "CLOSE TRAKTOR & CHECK MASTER") {
+                                if model.canResolveUnsavedAnalysis {
+                                    Task { await model.create() }
+                                } else {
+                                    Task { await model.saveAndQuitAfterAnalysis() }
+                                }
                             }
-                        }
-                        .font(.system(size: 9, weight: .semibold))
-                        .buttonStyle(.borderedProminent)
-                        .tint(.orange)
-                        Button("SHOW MASTER IN FINDER") { model.revealMasterInFinder() }
-                            .font(.system(size: 9, weight: .semibold))
-                            .buttonStyle(.bordered)
-                    } else {
-                        Button("DRAG STEREO MASTER INTO TRAKTOR") { model.openTraktorAndRevealMaster() }
                             .font(.system(size: 9, weight: .semibold))
                             .buttonStyle(.borderedProminent)
+                            .tint(.orange)
+                        } else {
+                            Button("OPEN TRAKTOR & SHOW MASTER") { model.openTraktorAndRevealMaster() }
+                                .font(.system(size: 9, weight: .semibold))
+                                .buttonStyle(.borderedProminent)
+                                .tint(.orange)
+                        }
                     }
-                    Button("CHECK TRAKTOR AGAIN") {
-                        Task { await model.checkTraktorForMaster() }
-                    }
+                    Button("SHOW MASTER IN FINDER") { model.revealMasterInFinder() }
                     .font(.system(size: 9, weight: .semibold))
                     .buttonStyle(.bordered)
                 }
@@ -149,7 +146,7 @@ struct ContentView: View {
         }
 
         if model.files[.master] == nil {
-            return ("STEP 1", "Add the stereo master in the Master slot below, add all five files individually, or use Import Folder.", "1.circle.fill", .blue)
+            return ("STEP 1", "Start by adding the stereo master in the Master slot. You may also add the four stems now—individually or with Import Folder—or add them later.", "1.circle.fill", .blue)
         }
         if model.collectionURL == nil || model.stemsDirectoryURL == nil {
             return ("STEP 2", "Confirm the Traktor Collection and Stems folder locations below.", "2.circle.fill", .blue)
@@ -160,10 +157,10 @@ struct ContentView: View {
         if model.nativeReadiness?.ready == false {
             if model.traktorRunning {
                 return ("NEXT ACTION", model.canResolveUnsavedAnalysis
-                    ? "Let Traktor finish analyzing the stereo master. Then choose Save, Quit Traktor & Install. Traktor may briefly say Updating Settings while it saves; that is normal."
-                    : "Let Traktor finish analyzing the stereo master. Then choose Save & Quit Traktor. Traktor may briefly say Updating Settings while it saves; that is normal.", "arrow.right.circle.fill", .orange)
+                    ? "Let Traktor finish analyzing the stereo master. Then choose Close Traktor & Install. The app will close Traktor, verify the saved analysis, install the stems, and reopen Traktor."
+                    : "Let Traktor finish analyzing the stereo master. Then choose Close Traktor & Check Master. The app will close Traktor, verify the saved analysis, and reopen it.", "arrow.right.circle.fill", .orange)
             }
-            return ("STEP 3", "Before lossless stems can be installed, the exact stereo master must be analyzed. Choose Drag Stereo Master into Traktor, then drop it into the Track Collection—not onto a deck.", "3.circle.fill", .blue)
+            return ("STEP 3", "Traktor must analyze the exact stereo master before lossless stems can be installed. Choose Open Traktor & Show Master, then drag the highlighted file into Track Collection—not onto a deck.", "3.circle.fill", .orange)
         }
         if !model.hasAllFiles {
             return ("STEP 4", "The analyzed master was found. Add the remaining four stems or import their five-file folder.", "4.circle.fill", .blue)
@@ -210,8 +207,25 @@ struct ContentView: View {
             guideRow(
                 icon: "waveform.badge.checkmark",
                 title: "Lossless Traktor Installation",
-                detail: "The exact stereo master must be in Traktor and analyzed before lossless stems can be installed. Add it here first so the app can check. If it is already analyzed, that step is skipped. Otherwise drag the highlighted master into Traktor’s Track Collection—not onto a deck—so Traktor adds and analyzes it. You may add the four stems before or after this step."
+                detail: "Start by adding the exact stereo master to this app. You may add the four stems at the same time—individually or with Import Folder—or add them later. If the master is already analyzed in Traktor, the app detects it and skips the import step. Otherwise the app opens Traktor and highlights the master in Finder. Drag it into Traktor’s Track Collection—not onto a deck—and let analysis finish. The orange button always shows the next required action."
             )
+
+            VStack(alignment: .leading, spacing: 7) {
+                Text("ONE-TIME MAC SECURITY SETUP")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(0.6)
+                Text("This free build is not Apple-notarized. If macOS blocks the app from closing Traktor, open System Settings > Privacy & Security and allow Traktor Stem Packager under Automation if it appears. App Management permission for Terminal or the installer is needed only when installing or replacing the app. If permission is denied, the app will pause and explain how to continue manually.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Color.white.opacity(0.68))
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("OPEN PRIVACY & SECURITY") { model.openPrivacyAndSecurity() }
+                    .font(.system(size: 9, weight: .semibold))
+                    .buttonStyle(.bordered)
+            }
+            .padding(11)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.orange.opacity(0.07))
+            .overlay(Rectangle().stroke(Color.orange.opacity(0.2)))
 
             Text("Important: use the same master file in both Traktor and this app. A different copy may create a separate library entry and will not inherit the original track’s cues or beat grid.")
                 .font(.system(size: 10))
@@ -232,7 +246,10 @@ struct ContentView: View {
                 }
                 .buttonStyle(.bordered)
                 Button("QUIT APP") {
-                    NSApplication.shared.terminate(nil)
+                    showWorkflowGuide = false
+                    DispatchQueue.main.async {
+                        NSApplication.shared.terminate(nil)
+                    }
                 }
                 .buttonStyle(.bordered)
                 Spacer()
@@ -367,7 +384,7 @@ struct ContentView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("v0.6.0-beta.11")
+                Text("v0.6.0-beta.12")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.62))
                 Text("AAC + VERIFIED LOSSLESS")
@@ -581,7 +598,7 @@ struct ContentView: View {
                     Task { await model.create() }
                 }
                     .buttonStyle(.borderedProminent)
-                    .tint(model.mode == .nativeLossless && model.canCreate ? .orange : Color(red: 0.32, green: 0.34, blue: 0.37))
+                    .tint(model.canCreate ? .orange : Color(red: 0.32, green: 0.34, blue: 0.37))
                     .disabled(!(model.canCreate || model.canResolveUnsavedAnalysis))
             }
         }

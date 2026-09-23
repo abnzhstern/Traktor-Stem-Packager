@@ -82,7 +82,7 @@ final class PackagerModel: ObservableObject {
 
     var primaryActionTitle: String {
         if mode == .portableAAC { return "CREATE AAC STEM FILE" }
-        if canResolveUnsavedAnalysis { return "SAVE, QUIT TRAKTOR & INSTALL" }
+        if canResolveUnsavedAnalysis { return "CLOSE TRAKTOR & INSTALL" }
         return "VERIFY & INSTALL LOSSLESS STEMS"
     }
 
@@ -332,7 +332,7 @@ final class PackagerModel: ObservableObject {
                 statusText = "Analyzed master found. Add or confirm the four stems, then continue."
             } else if traktorRunning {
                 statusText = "The analyzed master is not in Traktor’s saved collection yet. Finish analysis, then save or close Traktor."
-                recoveryText = "Traktor usually writes the new track ID when it saves its collection. Use the orange Save, Quit Traktor & Install button; the app will detect the closure and continue automatically."
+                recoveryText = "Traktor writes the new track ID when it saves its collection. Use the orange Close Traktor button; the app will verify the saved ID and continue automatically."
             } else {
                 statusText = result.message
                 recoveryText = "Choose Drag Stereo Master into Traktor below. Drop that exact file into Traktor’s Track Collection—not onto a deck—and let analysis finish."
@@ -340,7 +340,7 @@ final class PackagerModel: ObservableObject {
         } catch {
             nativeReadiness = NativeReadiness(ready: false, found: false, hasAudioId: false, linkedStemExists: false, message: error.localizedDescription)
             statusText = "Traktor’s collection could not be checked."
-            recoveryText = "Confirm the Collection path points to collection.nml, then choose Check Traktor Again."
+            recoveryText = "Confirm the Collection path points to collection.nml. The app will check again automatically."
         }
     }
 
@@ -351,10 +351,10 @@ final class PackagerModel: ObservableObject {
             return
         }
 
-        guard confirmManualTraktorQuit() else { return }
+        let traktorURL = traktor.bundleURL
 
         state = .packaging
-        guard await waitForUserToQuitTraktor(traktor) else { return }
+        guard await closeTraktorAndWait(traktor) else { return }
         statusText = "Checking Traktor’s saved track ID…"
         let readiness = await recheckNativeReadinessAfterTraktorQuit(master: files[.master], collection: collectionURL)
         state = report != nil && hasAllFiles ? .ready : .waiting
@@ -367,8 +367,10 @@ final class PackagerModel: ObservableObject {
                 : "Add the remaining four stem files individually or use Import Folder."
         } else {
             statusText = readiness?.message ?? "The saved Traktor track ID was not found."
-            recoveryText = "Open Traktor and confirm the exact master appears in the Track Collection and has finished analysis, then try again."
+            recoveryText = "Confirm the exact master appears in Traktor’s Track Collection and has finished analysis, then follow the orange next-action button."
         }
+        if let traktorURL { _ = NSWorkspace.shared.open(traktorURL) }
+        refreshTraktorStatus()
     }
 
     func openTraktorAndRevealMaster() {
@@ -397,7 +399,7 @@ final class PackagerModel: ObservableObject {
                     self.recoveryText = "Open Traktor manually, drag this exact stereo master into its Track Collection, analyze it, then return to this app."
                 } else {
                     self.statusText = "Your master is highlighted in Finder. Drag it into Traktor’s Track Collection now."
-                    self.recoveryText = "Let Traktor finish analyzing it. Then return here and choose Save, Quit Traktor & Continue—the app will take over from there."
+                    self.recoveryText = "Let Traktor finish analyzing it. Then return here and follow the orange Close Traktor button—the app will save, verify, and continue automatically."
                     self.revealMasterInFinder()
                 }
             }
@@ -411,8 +413,15 @@ final class PackagerModel: ObservableObject {
             NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder")
                 .first?.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
         }
-        statusText = "The stereo master is highlighted in Finder. Drag it into Traktor’s Track Collection."
-        recoveryText = "After Traktor finishes analyzing it, return here and follow the orange next-action button."
+        if nativeReadiness?.ready == true {
+            statusText = "The analyzed stereo master is highlighted in Finder."
+            recoveryText = hasAllFiles
+                ? "Return here and follow the orange install button."
+                : "Add the four matching stems to continue."
+        } else {
+            statusText = "The stereo master is highlighted in Finder. Drag it into Traktor’s Track Collection."
+            recoveryText = "After Traktor finishes analyzing it, return here and follow the orange next-action button."
+        }
     }
 
     func setArtwork(_ url: URL?) {
@@ -488,7 +497,7 @@ final class PackagerModel: ObservableObject {
             return "Re-export all five files from exactly the same start and end points, then try again."
         }
         if text.contains("audio_id") || text.contains("analy") || text.contains("collection") {
-            return "Analyze the exact master in Traktor, allow Traktor to save its collection, then choose Check Traktor Again."
+            return "Analyze the exact master in Traktor and allow Traktor to save its collection. The app will check again automatically."
         }
         return "Review the highlighted file slots and the message above. Replace the affected file, then try again. Your source files have not been changed."
     }
@@ -570,18 +579,18 @@ final class PackagerModel: ObservableObject {
 
         let warning = NSAlert()
         warning.messageText = needsSavedAnalysisRefresh && traktor != nil
-            ? "Save Traktor’s analysis and continue?"
+            ? "Close Traktor, save its analysis, and continue?"
             : traktor == nil
             ? "Verify and install lossless stems?"
             : "Close Traktor and install lossless stems?"
         warning.informativeText = needsSavedAnalysisRefresh && traktor != nil
-            ? "Traktor must save its collection before the app can verify the track ID. Continue, then quit Traktor normally. The app will wait and install automatically. Traktor may briefly display Updating Settings while saving; that is expected."
+            ? "The app will ask Traktor to close so it saves its collection, verify the track ID, install the lossless stems, and then reopen Traktor. Traktor may briefly display Updating Settings while saving; that is expected."
             : traktor == nil
             ? "The app will verify all five decoded PCM streams, back up collection.nml, install the lossless sidecar, and link it to the exact master track."
-            : "Traktor must close before installation. Continue, then quit Traktor normally. The app will wait and install automatically without requesting permission to close another app."
+            : "Traktor must close before installation. The app will ask it to close, install the lossless stems, and then reopen it. If macOS blocks that request, the app will show the exact manual fallback."
         warning.alertStyle = .warning
         if traktor != nil {
-            warning.addButton(withTitle: "Continue — I’ll Quit Traktor")
+            warning.addButton(withTitle: "Close Traktor & Continue")
             warning.addButton(withTitle: "Cancel")
         } else {
             warning.addButton(withTitle: "Verify & Install")
@@ -597,7 +606,7 @@ final class PackagerModel: ObservableObject {
         state = .packaging
         recoveryText = nil
         if let traktor {
-            guard await waitForUserToQuitTraktor(traktor) else { return }
+            guard await closeTraktorAndWait(traktor) else { return }
         }
         if needsSavedAnalysisRefresh {
             statusText = "Rechecking Traktor’s saved track analysis…"
@@ -608,7 +617,7 @@ final class PackagerModel: ObservableObject {
             guard readiness?.ready == true else {
                 state = .ready
                 statusText = readiness?.message ?? "Could not recheck the saved Traktor collection."
-                recoveryText = "Open Traktor and analyze the exact master. After analysis finishes, close Traktor normally and choose Check Traktor Again."
+                recoveryText = "Open Traktor and confirm the exact master has finished analysis. Then return here and follow the orange next-action button."
                 if shouldRelaunch, let traktorURL { _ = NSWorkspace.shared.open(traktorURL) }
                 refreshTraktorStatus()
                 return
@@ -676,20 +685,43 @@ final class PackagerModel: ObservableObject {
         }
     }
 
-    private func confirmManualTraktorQuit() -> Bool {
-        let prompt = NSAlert()
-        prompt.messageText = "Quit Traktor normally to continue"
-        prompt.informativeText = "The app will wait, detect when Traktor has saved and closed, then continue automatically. Traktor may briefly display Updating Settings while it saves; that is normal."
-        prompt.alertStyle = .informational
-        prompt.addButton(withTitle: "Continue — I’ll Quit Traktor")
-        prompt.addButton(withTitle: "Cancel")
-        return prompt.runModal() == .alertFirstButtonReturn
-    }
-
-    private func waitForUserToQuitTraktor(_ application: NSRunningApplication) async -> Bool {
+    private func closeTraktorAndWait(_ application: NSRunningApplication) async -> Bool {
         waitingForManualTraktorQuit = true
-        statusText = "Quit Traktor normally. This app is waiting and will continue automatically when Traktor closes."
-        recoveryText = "In Traktor, choose Traktor Pro 4 > Quit Traktor Pro 4. If Traktor says Updating Settings, let it finish—that is how it saves the analyzed master."
+        statusText = "Closing Traktor so it can save its collection…"
+        recoveryText = "If Traktor says Updating Settings, let it finish. The app will continue automatically when Traktor closes."
+        _ = application.terminate()
+
+        for _ in 0..<48 {
+            if application.isTerminated || runningTraktorApplication() == nil {
+                waitingForManualTraktorQuit = false
+                recoveryText = nil
+                refreshTraktorStatus()
+                statusText = "Traktor closed. Rechecking the saved analysis…"
+                return true
+            }
+            try? await Task.sleep(nanoseconds: 250_000_000)
+        }
+
+        let prompt = NSAlert()
+        prompt.messageText = "macOS did not allow Traktor to close automatically"
+        prompt.informativeText = "You can allow Traktor Stem Packager under System Settings > Privacy & Security > Automation if it appears there. Or quit Traktor normally now; the app will detect it and continue automatically."
+        prompt.alertStyle = .warning
+        prompt.addButton(withTitle: "Open Privacy & Security")
+        prompt.addButton(withTitle: "I’ll Quit Traktor")
+        prompt.addButton(withTitle: "Cancel")
+        let choice = prompt.runModal()
+        if choice == .alertFirstButtonReturn {
+            openPrivacyAndSecurity()
+        } else if choice == .alertThirdButtonReturn {
+            waitingForManualTraktorQuit = false
+            state = .ready
+            statusText = "Installation paused. Traktor is still open."
+            recoveryText = "Use the orange action again when you are ready. No files were changed."
+            return false
+        }
+
+        statusText = "Waiting for Traktor to close…"
+        recoveryText = "Quit Traktor normally if it remains open. The app will detect the closure and continue automatically."
         _ = application.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
 
         for _ in 0..<2400 {
@@ -708,6 +740,11 @@ final class PackagerModel: ObservableObject {
         statusText = "Traktor is still open, so installation has paused."
         recoveryText = "Quit Traktor normally, then choose Verify & Install Lossless Stems again. No files were changed."
         return false
+    }
+
+    func openPrivacyAndSecurity() {
+        let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy")!
+        NSWorkspace.shared.open(settingsURL)
     }
 
     private func traktorApplicationURL() -> URL? {
