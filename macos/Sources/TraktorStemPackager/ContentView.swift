@@ -162,6 +162,9 @@ struct ContentView: View {
             }
             return ("STEP 3", "Traktor must analyze the exact stereo master before lossless stems can be installed. Choose Open Traktor & Show Master, then drag the highlighted file into Track Collection—not onto a deck.", "3.circle.fill", .orange)
         }
+        if model.traktorRunning && model.hasAllFiles {
+            return ("READY TO VERIFY", "Traktor is open, so its current library state may not be saved yet. Choose Close Traktor & Verify / Install. The app will save and recheck the latest collection before changing anything.", "checkmark.circle.fill", .orange)
+        }
         if !model.hasAllFiles {
             return ("STEP 4", "The analyzed master was found. Add the remaining four stems or import their five-file folder.", "4.circle.fill", .blue)
         }
@@ -227,7 +230,7 @@ struct ContentView: View {
             .background(Color.orange.opacity(0.07))
             .overlay(Rectangle().stroke(Color.orange.opacity(0.2)))
 
-            Text("Important: matching uses the master’s exact saved file location, not an audio fingerprint. Use the same file in Traktor and this app. A copy stored elsewhere may create a separate entry and will not inherit the original track’s cues or beat grid.")
+            Text("IMPORTANT FOR LOSSLESS: Select the same stereo master file that Traktor analyzed. The app attaches the stems to that file’s existing Traktor library entry, preserving its cues and beat grid. If you select a duplicate copy from another folder, Traktor may treat it as a different track.")
                 .font(.system(size: 10))
                 .foregroundStyle(Color.orange.opacity(0.9))
                 .padding(10)
@@ -392,7 +395,7 @@ struct ContentView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("v0.6.0-beta.13")
+                Text("v0.6.0-beta.14")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.62))
                 Text("AAC + VERIFIED LOSSLESS")

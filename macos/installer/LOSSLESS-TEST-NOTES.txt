@@ -6,7 +6,7 @@ This app does not create or separate stems. Start with four stems you already
 created or received, plus the matching stereo master.
 
 Before testing:
-1. Confirm the app title bar says v0.6.0-beta.13, then select
+1. Confirm the app title bar says v0.6.0-beta.14, then select
    “Lossless Traktor Installation.”
 2. Choose the collection.nml used by that Traktor installation.
 3. Choose the Stems folder configured in Traktor Pro 4 Preferences.
@@ -21,8 +21,11 @@ Before testing:
    You can also choose IMPORT FOLDER, review the proposed assignments, drag
    files between slots to correct them, and choose ACCEPT ASSIGNMENTS.
 6. Follow the orange next-action button. When Traktor must save its analysis,
-   the app asks Traktor to close, verifies the saved ID, installs the stems, and
-   reopens Traktor. If macOS blocks automatic closing, the app opens the relevant
+   the app asks Traktor to close, verifies the latest saved collection and ID,
+   installs the stems only if the master is still present, and reopens Traktor.
+   If the master was deleted during the current Traktor session, the app stops,
+   highlights it in Finder, and tells you to import and analyze it again. If
+   macOS blocks automatic closing, the app opens the relevant
    Privacy & Security settings and provides a manual fallback.
 7. In Traktor, load the ORIGINAL master track. Do not import the hashed .stem.mp4 directly.
 

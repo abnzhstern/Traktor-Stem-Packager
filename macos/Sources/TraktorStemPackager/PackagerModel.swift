@@ -115,6 +115,7 @@ final class PackagerModel: ObservableObject {
     var primaryActionTitle: String {
         if mode == .portableAAC { return "CREATE AAC STEM FILE" }
         if canResolveUnsavedAnalysis { return "CLOSE TRAKTOR & INSTALL" }
+        if traktorRunning { return "CLOSE TRAKTOR & VERIFY / INSTALL" }
         return "VERIFY & INSTALL LOSSLESS STEMS"
     }
 
@@ -336,7 +337,6 @@ final class PackagerModel: ObservableObject {
            mode == .nativeLossless,
            files[.master] != nil,
            collectionURL != nil,
-           nativeReadiness?.ready != true,
            state != .packaging {
             await checkTraktorForMaster()
         }
@@ -388,7 +388,9 @@ final class PackagerModel: ObservableObject {
             nativeReadiness = result
             refreshTraktorStatus()
             if result.ready {
-                statusText = "Analyzed master found. Add or confirm the four stems, then continue."
+                statusText = traktorRunning
+                    ? "The saved collection contains this master. Because Traktor is open, the app will close it and verify the current saved state before installation."
+                    : "Analyzed master found. Add or confirm the four stems, then continue."
             } else if traktorRunning {
                 statusText = "The analyzed master is not in Traktor’s saved collection yet. Finish analysis, then save or close Traktor."
                 recoveryText = "Traktor writes the new track ID when it saves its collection. Use the orange Close Traktor button; the app will verify the saved ID and continue automatically."
@@ -473,13 +475,18 @@ final class PackagerModel: ObservableObject {
                 .first?.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
         }
         if nativeReadiness?.ready == true {
-            statusText = "The analyzed stereo master is highlighted in Finder."
-            recoveryText = hasAllFiles
-                ? "Return here and follow the orange install button."
-                : "Add the four matching stems to continue."
+            if traktorRunning {
+                statusText = "The stereo master is highlighted in Finder. Confirm that this exact file is still in Traktor’s Track Collection."
+                recoveryText = "If it is missing, drag the highlighted file into Track Collection—not onto a deck—and let analysis finish. The app will verify Traktor’s saved state before installation."
+            } else {
+                statusText = "The analyzed stereo master is highlighted in Finder."
+                recoveryText = hasAllFiles
+                    ? "Return here and follow the orange install button."
+                    : "Add the four matching stems to continue."
+            }
         } else {
-            statusText = "The stereo master is highlighted in Finder. Drag it into Traktor’s Track Collection."
-            recoveryText = "After Traktor finishes analyzing it, return here and follow the orange next-action button."
+            statusText = "The master is not currently in Traktor’s saved collection. Import the highlighted stereo master to continue."
+            recoveryText = "Drag the highlighted file into Traktor’s Track Collection—not onto a deck—and let Traktor finish analyzing it. Then return here and follow the orange next-action button."
         }
     }
 
@@ -623,33 +630,15 @@ final class PackagerModel: ObservableObject {
         let traktor = runningTraktorApplication()
         let shouldRelaunch = traktor != nil
         let traktorURL = traktor?.bundleURL
-        let needsSavedAnalysisRefresh = nativeReadiness?.ready != true
-
-        if nativeReadiness?.linkedStemExists == true {
-            let replacement = NSAlert()
-            replacement.messageText = "Replace the existing linked stems?"
-            replacement.informativeText = "This master already has a linked Stem file. Replace Existing will install this set and keep the previous file as a timestamped .bak safety backup. The .bak file is not a second active Stem set."
-            replacement.alertStyle = .warning
-            replacement.addButton(withTitle: "Replace Existing")
-            replacement.addButton(withTitle: "Cancel")
-            guard replacement.runModal() == .alertFirstButtonReturn else {
-                statusText = "Installation cancelled. The existing linked stems were not changed."
-                recoveryText = nil
-                return
-            }
-        }
 
         let warning = NSAlert()
-        warning.messageText = needsSavedAnalysisRefresh && traktor != nil
-            ? "Close Traktor, save its analysis, and continue?"
-            : traktor == nil
-            ? "Verify and install lossless stems?"
-            : "Close Traktor and install lossless stems?"
-        warning.informativeText = needsSavedAnalysisRefresh && traktor != nil
-            ? "The app will ask Traktor to close so it saves its collection, verify the track ID, install the lossless stems, and then reopen Traktor. Traktor may briefly display Updating Settings while saving; that is expected."
-            : traktor == nil
-            ? "The app will verify all five decoded PCM streams, back up collection.nml, install the lossless sidecar, and link it to the exact master track."
-            : "Traktor must close before installation. The app will ask it to close, install the lossless stems, and then reopen it. If macOS blocks that request, the app will show the exact manual fallback."
+        if traktor != nil {
+            warning.messageText = "Close Traktor, verify its saved collection, and continue?"
+            warning.informativeText = "The app will ask Traktor to close so its latest library state is saved. It will confirm that this exact master still exists and is analyzed before installing anything, then reopen Traktor."
+        } else {
+            warning.messageText = "Verify and install lossless stems?"
+            warning.informativeText = "The app will recheck the saved collection, verify all five decoded PCM streams, back up collection.nml, install the lossless sidecar, and link it to the exact master track."
+        }
         warning.alertStyle = .warning
         if traktor != nil {
             warning.addButton(withTitle: "Close Traktor & Continue")
@@ -670,16 +659,35 @@ final class PackagerModel: ObservableObject {
         if let traktor {
             guard await closeTraktorAndWait(traktor) else { return }
         }
-        if needsSavedAnalysisRefresh {
-            statusText = "Rechecking Traktor’s saved track analysis…"
-            let readiness = await recheckNativeReadinessAfterTraktorQuit(
-                master: files[.master],
-                collection: collectionURL
-            )
-            guard readiness?.ready == true else {
+        statusText = "Verifying Traktor’s latest saved collection…"
+        let readiness = await recheckNativeReadinessAfterTraktorQuit(
+            master: files[.master],
+            collection: collectionURL
+        )
+        guard readiness?.ready == true else {
+            state = .ready
+            statusText = "The stereo master is not in Traktor’s latest saved collection. Import and analyze it before installing the lossless stems."
+            recoveryText = "Open Traktor and drag the exact master selected in this app into Track Collection—not onto a deck. Let analysis finish, then return here and follow the orange next-action button. No collection or Stem files were changed."
+            if shouldRelaunch, let traktorURL {
+                _ = NSWorkspace.shared.open(traktorURL)
+                try? await Task.sleep(nanoseconds: 700_000_000)
+                refreshTraktorStatus()
+                revealMasterInFinder()
+            }
+            return
+        }
+
+        if readiness?.linkedStemExists == true {
+            let replacement = NSAlert()
+            replacement.messageText = "Replace the existing linked stems?"
+            replacement.informativeText = "The latest saved Traktor collection already links this master to a Stem file. Replace Existing will install this set and keep the previous file as a timestamped .bak safety backup. The .bak file is not a second active Stem set."
+            replacement.alertStyle = .warning
+            replacement.addButton(withTitle: "Replace Existing")
+            replacement.addButton(withTitle: "Cancel")
+            guard replacement.runModal() == .alertFirstButtonReturn else {
                 state = .ready
-                statusText = readiness?.message ?? "Could not recheck the saved Traktor collection."
-                recoveryText = "Open Traktor and confirm the exact master has finished analysis. Then return here and follow the orange next-action button."
+                statusText = "Installation cancelled. The existing linked stems were not changed."
+                recoveryText = nil
                 if shouldRelaunch, let traktorURL { _ = NSWorkspace.shared.open(traktorURL) }
                 refreshTraktorStatus()
                 return

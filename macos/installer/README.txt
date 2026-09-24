@@ -59,11 +59,13 @@ LOSSLESS TRAKTOR HANDOFF
 
 The lossless workflow checks Traktor's collection first. If the exact master file at that saved location is already analyzed, the import step is skipped. The stems are linked to the existing collection entry without replacing the master or removing its cues, beat grid, loops, or other Traktor data.
 
+Traktor saves additions and deletions to collection.nml when it closes. If Traktor is open, the app treats the on-disk collection as potentially out of date. Before every lossless installation, the app closes Traktor when necessary and rechecks the newly saved collection. It will not install anything unless the selected master is still present and analyzed. If the master is missing, the app highlights it in Finder and tells you to import it into Traktor's Track Collection.
+
 Start by adding the exact stereo master to the app. You may add the four stems at the same time, individually or with Import Folder, or add them later. If the master is not already analyzed, choose Open Traktor & Show Master. The app opens Traktor and brings Finder to the foreground with the exact master highlighted. Drag it into Traktor's Track Collection, not onto a deck, and let analysis finish. Show Master in Finder remains available whenever a master is loaded.
 
 If linked stems already exist for that master, the app asks before replacing them. A timestamped .bak file is a safety backup of the previous linked Stem file, not a second active Stem set.
 
-Traktor must close before the app edits collection.nml. Follow the orange next-action button. The app asks Traktor to close, verifies the saved analysis, installs the stems, and reopens Traktor. Traktor may briefly say Updating Settings while saving its collection; that is expected.
+Traktor must close before the app edits collection.nml. Follow the orange next-action button. The app asks Traktor to close, verifies the latest saved collection, installs the stems only if the master is present and analyzed, and reopens Traktor. Traktor may briefly say Updating Settings while saving its collection; that is expected.
 
 MAC PRIVACY & SECURITY
 
