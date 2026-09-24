@@ -1,6 +1,6 @@
 {
   "name": "traktor-stem-packager",
-  "version": "0.6.0-beta.15",
+  "version": "0.6.0-beta.16",
   "private": true,
   "type": "module",
   "description": "Self-contained macOS Traktor Stem packaging engine prototype",

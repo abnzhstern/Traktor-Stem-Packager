@@ -233,11 +233,12 @@ struct ContentView: View {
                         bestFor: "Choose this to preserve source PCM and keep the existing Traktor master entry.",
                         result: "Creates a linked lossless Stem file for the original master.",
                         steps: [
-                            "Add the exact stereo master and four stems.",
-                            "If needed, the app walks you through importing and analyzing that master in Track Collection.",
+                            "Add the stereo master and four matching stems to this app.",
+                            "Already in Traktor? Select the exact same master file that Traktor analyzed. The app links the four stems to that existing track and preserves its cues, beat grid, loops and other Traktor data.",
+                            "Not in Traktor? The app walks you through importing and analyzing the master, then links the four stems to it as a new track.",
                             "Follow the single orange action. The app verifies Traktor’s saved collection, installs the stems and reopens Traktor."
                         ],
-                        note: "Select the same master file that Traktor analyzed. The existing entry—and its cues, beat grid, loops and other Traktor data—is preserved. A duplicate stored in another folder may be treated as a different track."
+                        note: "In both cases, load the stereo master in Traktor to use the four linked lossless stems. A duplicate master stored in another folder may be treated as a different track."
                     )
 
                     HStack(spacing: 9) {
@@ -467,7 +468,7 @@ struct ContentView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("v0.6.0-beta.15")
+                Text("v0.6.0-beta.16")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.62))
                 Text("AAC + VERIFIED LOSSLESS")

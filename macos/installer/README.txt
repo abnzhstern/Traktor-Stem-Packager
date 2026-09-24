@@ -66,6 +66,10 @@ LOSSLESS TRAKTOR HANDOFF
 
 The lossless workflow checks Traktor's collection first. If the exact master file at that saved location is already analyzed, the import step is skipped. The stems are linked to the existing collection entry without replacing the master or removing its cues, beat grid, loops, or other Traktor data.
 
+If the master is already analyzed in Traktor, add that exact same master file and the four matching stems to the app. The app links the four lossless stems to the existing track and preserves its Traktor data.
+
+If the master is not in Traktor, add the master and four stems to the app. The app walks you through importing and analyzing the master, then links the four lossless stems to it as a new track.
+
 Traktor saves additions and deletions to collection.nml when it closes. If Traktor is open, the app treats the on-disk collection as potentially out of date. Before every lossless installation, the app closes Traktor when necessary and rechecks the newly saved collection. It will not install anything unless the selected master is still present and analyzed. If the master is missing, the app highlights it in Finder and tells you to import it into Traktor's Track Collection.
 
 Start by adding the exact stereo master to the app. You may add the four stems at the same time, individually or with Import Folder, or add them later. If the master is not already analyzed, choose Open Traktor & Show Master. The app opens Traktor and brings Finder to the foreground with the exact master highlighted. Drag it into Traktor's Track Collection, not onto a deck, and let analysis finish. Show Master in Finder remains available whenever a master is loaded.
