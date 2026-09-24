@@ -21,12 +21,13 @@ done
 
 cd "$MACOS_DIR"
 swift build -c release --arch arm64
+SWIFT_BIN_DIR=$(swift build -c release --arch arm64 --show-bin-path)
 
 cd "$PROJECT_DIR"
 npm ci --omit=dev
 
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources/Runtime" "$APP_DIR/Contents/Resources/Engine"
-cp "$MACOS_DIR/.build/arm64-apple-macosx/release/TraktorStemPackager" "$APP_DIR/Contents/MacOS/TraktorStemPackager"
+cp "$SWIFT_BIN_DIR/TraktorStemPackager" "$APP_DIR/Contents/MacOS/TraktorStemPackager"
 cp "$MACOS_DIR/Info.plist" "$APP_DIR/Contents/Info.plist"
 cp "$RUNTIME_DIR/node" "$RUNTIME_DIR/ffmpeg" "$RUNTIME_DIR/ffprobe" "$APP_DIR/Contents/Resources/Runtime/"
 cp -R "$PROJECT_DIR/src" "$PROJECT_DIR/vendor" "$PROJECT_DIR/node_modules" "$PROJECT_DIR/package.json" "$APP_DIR/Contents/Resources/Engine/"
