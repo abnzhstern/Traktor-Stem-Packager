@@ -59,8 +59,8 @@ jobs:
           test -f "$APP/Contents/Resources/AppIcon.icns"
           test "$(plutil -extract CFBundleDisplayName raw "$APP/Contents/Info.plist")" = "Traktor Stem Packager"
           test "$(plutil -extract CFBundleIconFile raw "$APP/Contents/Info.plist")" = "AppIcon"
-          test "$(plutil -extract CFBundleShortVersionString raw "$APP/Contents/Info.plist")" = "0.6.0-beta.16"
-          grep -F 'Text("v0.6.0-beta.16")' macos/Sources/TraktorStemPackager/ContentView.swift
+          test "$(plutil -extract CFBundleShortVersionString raw "$APP/Contents/Info.plist")" = "0.6.0-beta.17"
+          grep -F 'Text("v0.6.0-beta.17")' macos/Sources/TraktorStemPackager/ContentView.swift
           grep -F 'Text("CHOOSE ONE OF TWO WORKFLOWS")' macos/Sources/TraktorStemPackager/ContentView.swift
           grep -F 'case .rememberLastUsed: "Remember Last Used"' macos/Sources/TraktorStemPackager/AudioRole.swift
           grep -F 'case .nativeLossless: "Lossless Traktor Installation"' macos/Sources/TraktorStemPackager/AudioRole.swift
@@ -80,15 +80,64 @@ jobs:
           cp "macos/installer/README.txt" "$DIST/"
           cp "macos/installer/LOSSLESS-TEST-NOTES.txt" "$DIST/"
           chmod +x "$DIST/Install Traktor Stem Packager.command"
-          ditto -c -k --sequesterRsrc --keepParent "$DIST" "Traktor-Stem-Packager-0.6.0-beta.16-dual-mode-test.zip"
-          shasum -a 256 "Traktor-Stem-Packager-0.6.0-beta.16-dual-mode-test.zip" > "Traktor-Stem-Packager-0.6.0-beta.16-dual-mode-test.zip.sha256"
+          ditto -c -k --sequesterRsrc --keepParent "$DIST" "Traktor-Stem-Packager-0.6.0-beta.17-dual-mode-test.zip"
+          shasum -a 256 "Traktor-Stem-Packager-0.6.0-beta.17-dual-mode-test.zip" > "Traktor-Stem-Packager-0.6.0-beta.17-dual-mode-test.zip.sha256"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Traktor-Stem-Packager-0.6.0-beta.16-dual-mode-test
+          name: Traktor-Stem-Packager-0.6.0-beta.17-dual-mode-test
           path: |
-            Traktor-Stem-Packager-0.6.0-beta.16-dual-mode-test.zip
-            Traktor-Stem-Packager-0.6.0-beta.16-dual-mode-test.zip.sha256
+            Traktor-Stem-Packager-0.6.0-beta.17-dual-mode-test.zip
+            Traktor-Stem-Packager-0.6.0-beta.17-dual-mode-test.zip.sha256
           if-no-files-found: error
           retention-days: 14
+
+  compatibility:
+    name: Compatibility — ${{ matrix.name }}
+    needs: build
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.experimental }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS 26 stable
+            runner: macos-26
+            experimental: false
+          - name: macOS 27 preview
+            runner: xcode-27
+            experimental: true
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Report test system
+        run: sw_vers && uname -m
+
+      - name: Run engine tests
+        run: |
+          npm ci
+          npm test
+
+      - name: Prepare arm64 runtime
+        run: macos/scripts/prepare-runtime.sh
+
+      - name: Verify lossless PCM round trip
+        env:
+          STEM_PACKAGER_FFMPEG: macos/Runtime/macos-arm64/ffmpeg
+          STEM_PACKAGER_FFPROBE: macos/Runtime/macos-arm64/ffprobe
+        run: node --test test/lossless-roundtrip.test.mjs
+
+      - name: Build and verify app bundle
+        run: |
+          macos/scripts/build-app.sh
+          APP="macos/build/Traktor Stem Packager.app"
+          codesign --verify --deep --strict "$APP"
+          file "$APP/Contents/MacOS/TraktorStemPackager" | grep arm64
+          file "$APP/Contents/Resources/Runtime/node" | grep arm64
+          file "$APP/Contents/Resources/Runtime/ffmpeg" | grep arm64
+          test "$(plutil -extract CFBundleShortVersionString raw "$APP/Contents/Info.plist")" = "0.6.0-beta.17"
+          zsh -n "macos/installer/Install Traktor Stem Packager.command"

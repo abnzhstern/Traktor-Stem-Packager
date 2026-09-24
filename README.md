@@ -27,6 +27,7 @@ The current build supports **Apple Silicon Macs** running **macOS 14 or newer**.
 - Rechecks Traktor automatically after closure; the internal collection check is not exposed as a confusing workflow button
 - Preserves the existing Traktor library entry so its cues, beat grid, loops, and other track data remain attached
 - Provides Clear All, drag-and-drop reassignment, accepted-assignment locking, and Edit Assignments
+- Keeps a neutral Open Traktor / Bring Traktor Forward control available without competing with the orange next workflow action
 - Opens with a workflow guide explaining what the app does and walking through the selected workflow; users can choose **Don't Show Again** and reopen it later with **How It Works**
 - Highlights empty file slots, verifies the complete audio set automatically, and identifies incompatible files with a specific remedy
 - Measures the unprocessed four-stem sum and enables limiter protection only when needed
@@ -51,7 +52,11 @@ The four role names are defaults required by the internal Traktor layout, but th
 
 The installer places the app in Applications, clears quarantine attributes from this app only, repairs executable permissions, creates a local ad-hoc signature, verifies the app, and launches it. It does not disable Gatekeeper or alter system-wide security settings.
 
+The in-app security guide explains the separate first-launch, App Management, and Automation permissions, opens the relevant System Settings sections, and always provides a manual Traktor-quit fallback.
+
 To update, run the newer installer without deleting the existing app first. It installs the update in the same Applications location and moves the previous version to the Trash as a recoverable backup.
+
+Every build is tested on the release runner and macOS 26. The macOS 27 preview job is an early-warning check and does not block stable builds while that operating system remains in preview.
 
 The app checks GitHub Releases at most once every 24 hours and displays a notice when a newer version is available. You can also choose **Check for Updates…** from the app menu. Automatic connection failures are silent, no audio or metadata is uploaded, and downloads always use the permanent [latest-release link](https://github.com/abnzhstern/Traktor-Stem-Packager/releases/latest).
 

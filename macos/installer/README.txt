@@ -17,7 +17,7 @@ AAC STEM FILE WORKFLOW
 
 The AAC workflow creates one shareable .stem.mp4 file. Drag that finished .stem.mp4 directly into Traktor's Track Collection or a deck; the four packaged stems will be present automatically. No master-track analysis or linked-folder setup is required for this workflow. Traktor treats the finished .stem.mp4 as a new track, so cues, beat grids, loops, and play history from a separate stereo-master entry do not transfer automatically.
 
-Files can be added individually, or Import Folder can propose assignments from a folder containing exactly five supported audio files. Always review the proposed assignments before accepting them. Drag a file onto another slot to reassign it. Accepted assignments lock; choose Edit Assignments to change them. Clear All empties the queue without deleting source files.
+Files can be added individually, or Import Folder can propose assignments from a folder containing exactly five supported audio files. Always review the proposed assignments before accepting them. Drag a file onto another slot to reassign it. Accepted assignments lock; choose Edit Assignments to change them. After either manual entry or folder import is accepted and verified, the orange primary action becomes available. Clear All empties the queue without deleting source files.
 
 IMPORTANT
 Keep these two items together in this folder:
@@ -80,9 +80,11 @@ Traktor must close before the app edits collection.nml. Follow the orange next-a
 
 MAC PRIVACY & SECURITY
 
-This free build is not Apple-notarized. If macOS blocks the app from closing Traktor, open System Settings > Privacy & Security and allow Traktor Stem Packager under Automation if it appears. The app's How It Works page includes a button that opens Privacy & Security. If permission remains unavailable, the app pauses and walks you through quitting Traktor manually, then continues automatically.
+This free build is not Apple-notarized. The app's How to Use page separates the first-launch, App Management, and Automation steps and includes buttons for the relevant Privacy & Security sections. If macOS blocks the app from closing Traktor, enable Traktor Stem Packager under Automation if it appears. If permission remains unavailable, the app pauses and walks you through quitting Traktor manually, then continues automatically.
 
 App Management permission for Terminal or the installer is separate. It is needed only when installing or replacing Traktor Stem Packager in the Applications folder. Manually closing Traktor does not affect that installation notice.
+
+Open Traktor / Bring Traktor Forward remains available in the app header as a neutral convenience control. Orange is reserved for the required next workflow action.
 
 PREFERENCES
 

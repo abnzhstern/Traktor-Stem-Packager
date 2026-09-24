@@ -41,6 +41,7 @@ final class PackagerModel: ObservableObject {
     @Published var recoveryText: String?
     @Published var validationProblemRoles: Set<AudioRole> = []
     @Published var folderImportNeedsReview = false
+    @Published private(set) var validationAccepted = false
     @Published var waitingForManualTraktorQuit = false
     private var extractedArtworkURL: URL?
     private var readinessTask: Task<Void, Never>?
@@ -93,16 +94,10 @@ final class PackagerModel: ObservableObject {
     }
 
     var hasAllFiles: Bool { AudioRole.allCases.allSatisfy { files[$0] != nil } }
-    var audioSetValidated: Bool {
-        guard hasAllFiles, report != nil else { return false }
-        switch state {
-        case .ready, .packaging, .complete: return true
-        case .waiting, .validating, .failed: return false
-        }
-    }
+    var audioSetValidated: Bool { hasAllFiles && validationAccepted && report != nil }
     var assignmentsLocked: Bool { audioSetValidated && !folderImportNeedsReview }
     var canCreate: Bool {
-        state == .ready && hasAllFiles &&
+        state == .ready && audioSetValidated &&
             (mode == .portableAAC || (collectionURL != nil && stemsDirectoryURL != nil && nativeReadiness?.ready == true))
     }
 
@@ -123,6 +118,7 @@ final class PackagerModel: ObservableObject {
         mode = newMode
         UserDefaults.standard.set(newMode.rawValue, forKey: Self.lastUsedModeKey)
         report = nil
+        validationAccepted = false
         validationProblemRoles = []
         recoveryText = nil
         state = .waiting
@@ -143,6 +139,7 @@ final class PackagerModel: ObservableObject {
             files[role] = url
         }
         report = nil
+        validationAccepted = false
         validationProblemRoles = []
         recoveryText = nil
         state = .waiting
@@ -159,6 +156,8 @@ final class PackagerModel: ObservableObject {
 
     func importFolder(_ directory: URL) {
         let supported = Set(["wav", "wave", "aif", "aiff", "m4a", "aac", "mp3"])
+        report = nil
+        validationAccepted = false
         do {
             let audioFiles = try FileManager.default.contentsOfDirectory(
                 at: directory,
@@ -195,6 +194,7 @@ final class PackagerModel: ObservableObject {
 
             files = assignments
             report = nil
+            validationAccepted = false
             validationProblemRoles = []
             recoveryText = nil
             folderImportNeedsReview = true
@@ -224,6 +224,7 @@ final class PackagerModel: ObservableObject {
         guard hasAllFiles else { return }
         folderImportNeedsReview = true
         report = nil
+        validationAccepted = false
         validationProblemRoles = []
         recoveryText = nil
         state = .waiting
@@ -247,6 +248,7 @@ final class PackagerModel: ObservableObject {
     func clear(_ role: AudioRole) {
         files[role] = nil
         report = nil
+        validationAccepted = false
         validationProblemRoles = []
         recoveryText = nil
         folderImportNeedsReview = false
@@ -270,6 +272,7 @@ final class PackagerModel: ObservableObject {
         readinessTask?.cancel()
         files.removeAll()
         report = nil
+        validationAccepted = false
         nativeReadiness = nil
         validationProblemRoles = []
         folderImportNeedsReview = false
@@ -531,19 +534,26 @@ final class PackagerModel: ObservableObject {
 
     func validate() async {
         guard hasAllFiles else { return }
+        let validationFiles = files
+        let validationMode = mode
+        validationAccepted = false
         state = .validating
         statusText = "Checking sample rate, channels, duration and stem-sum peak…"
         recoveryText = nil
         do {
             let bridge = try EngineBridge()
-            let result = try await bridge.validate(files: files, mode: mode)
+            let result = try await bridge.validate(files: validationFiles, mode: validationMode)
+            guard files == validationFiles, mode == validationMode else { return }
             report = result
             validationProblemRoles = []
+            validationAccepted = true
             state = .ready
             statusText = result.limiterEnabled
                 ? String(format: "Accepted. All five files match. Peak protection is enabled at a −0.3 dBFS ceiling because the combined peak is %.1f dBFS.", result.stemSumTruePeakDbfs)
                 : String(format: "Accepted. All five files match. Peak protection is not needed; the combined peak is %.1f dBFS.", result.stemSumTruePeakDbfs)
         } catch {
+            guard files == validationFiles, mode == validationMode else { return }
+            validationAccepted = false
             validationProblemRoles = problemRoles(from: error.localizedDescription)
             state = .failed(error.localizedDescription)
             statusText = error.localizedDescription
@@ -774,14 +784,14 @@ final class PackagerModel: ObservableObject {
 
         let prompt = NSAlert()
         prompt.messageText = "macOS did not allow Traktor to close automatically"
-        prompt.informativeText = "You can allow Traktor Stem Packager under System Settings > Privacy & Security > Automation if it appears there. Or quit Traktor normally now; the app will detect it and continue automatically."
+        prompt.informativeText = "Choose Open Automation Settings. In Privacy & Security > Automation, enable Traktor Stem Packager if it appears, then return here and quit Traktor normally. The app will detect the closure and continue automatically. If no Automation entry appears, use the manual option—no files have been changed."
         prompt.alertStyle = .warning
-        prompt.addButton(withTitle: "Open Privacy & Security")
+        prompt.addButton(withTitle: "Open Automation Settings")
         prompt.addButton(withTitle: "I’ll Quit Traktor")
         prompt.addButton(withTitle: "Cancel")
         let choice = prompt.runModal()
         if choice == .alertFirstButtonReturn {
-            openPrivacyAndSecurity()
+            openAutomationSettings()
         } else if choice == .alertThirdButtonReturn {
             waitingForManualTraktorQuit = false
             state = .ready
@@ -815,6 +825,22 @@ final class PackagerModel: ObservableObject {
     func openPrivacyAndSecurity() {
         let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy")!
         NSWorkspace.shared.open(settingsURL)
+    }
+
+    func openAutomationSettings() {
+        openPrivacyPane(anchor: "Privacy_Automation")
+    }
+
+    func openAppManagementSettings() {
+        openPrivacyPane(anchor: "Privacy_AppBundles")
+    }
+
+    private func openPrivacyPane(anchor: String) {
+        guard let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(anchor)"),
+              NSWorkspace.shared.open(settingsURL) else {
+            openPrivacyAndSecurity()
+            return
+        }
     }
 
     func openTraktor() {

@@ -255,13 +255,20 @@ struct ContentView: View {
                         Text("ONE-TIME MAC SECURITY SETUP")
                             .font(.system(size: 10, weight: .bold))
                             .tracking(0.6)
-                        Text("This free build is not Apple-notarized. If macOS blocks the app from closing Traktor, allow Traktor Stem Packager under System Settings > Privacy & Security > Automation. If permission is unavailable, the app explains the manual fallback.")
+                        Text("This free build is not Apple-notarized. Most users only need these steps once, and only when macOS displays the corresponding warning.")
                             .font(.system(size: 10))
                             .foregroundStyle(Color.white.opacity(0.62))
                             .fixedSize(horizontal: false, vertical: true)
-                        Button("OPEN PRIVACY & SECURITY") { model.openPrivacyAndSecurity() }
-                            .font(.system(size: 9, weight: .semibold))
-                            .buttonStyle(.bordered)
+                        securityStep("1", "If macOS blocks the first launch, open Privacy & Security, scroll to Security, choose Open Anyway, then confirm Open.")
+                        securityStep("2", "If macOS says an app was prevented from modifying apps, open App Management and enable Terminal or Traktor Stem Packager—whichever macOS names in the warning.")
+                        securityStep("3", "If automatic Traktor closing is blocked, open Automation and enable Traktor Stem Packager. If it is not listed, quit Traktor normally; the app will detect it and continue.")
+                        HStack(spacing: 8) {
+                            Button("GENERAL SECURITY") { model.openPrivacyAndSecurity() }
+                            Button("APP MANAGEMENT") { model.openAppManagementSettings() }
+                            Button("AUTOMATION") { model.openAutomationSettings() }
+                        }
+                        .font(.system(size: 9, weight: .semibold))
+                        .buttonStyle(.bordered)
                     }
                     .padding(11)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -361,6 +368,20 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(accent.opacity(0.055))
         .overlay(Rectangle().stroke(accent.opacity(0.28), lineWidth: 1))
+    }
+
+    private func securityStep(_ number: String, _ text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(number)
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(Color.black.opacity(0.82))
+                .frame(width: 17, height: 17)
+                .background(Circle().fill(Color.orange.opacity(0.9)))
+            Text(text)
+                .font(.system(size: 9.5))
+                .foregroundStyle(Color.white.opacity(0.62))
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     private var modePanel: some View {
@@ -468,16 +489,22 @@ struct ContentView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("v0.6.0-beta.16")
+                Text("v0.6.0-beta.17")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.62))
                 Text("AAC + VERIFIED LOSSLESS")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.35))
-                Button("HOW TO USE") { showWorkflowGuide = true }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(Color.white.opacity(0.55))
+                HStack(spacing: 10) {
+                    Button(model.traktorRunning ? "BRING TRAKTOR FORWARD" : "OPEN TRAKTOR") {
+                        model.openTraktor()
+                    }
+                    .buttonStyle(.bordered)
+                    Button("HOW TO USE") { showWorkflowGuide = true }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Color.white.opacity(0.55))
+                }
+                .font(.system(size: 9, weight: .semibold))
             }
         }
         .padding(.horizontal, 16)
