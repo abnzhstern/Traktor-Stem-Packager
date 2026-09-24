@@ -27,5 +27,10 @@ struct TraktorStemPackagerApp: App {
                 .disabled(model.files.isEmpty)
             }
         }
+
+        Settings {
+            PreferencesView()
+                .environmentObject(model)
+        }
     }
 }

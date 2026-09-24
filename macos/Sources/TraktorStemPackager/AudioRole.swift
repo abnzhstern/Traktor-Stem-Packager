@@ -26,6 +26,21 @@ enum PackagingMode: String, CaseIterable, Identifiable {
     }
 }
 
+enum StartupWorkflow: String, CaseIterable, Identifiable {
+    case rememberLastUsed
+    case portableAAC
+    case nativeLossless
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .rememberLastUsed: "Remember Last Used"
+        case .portableAAC: "AAC Stem File"
+        case .nativeLossless: "Lossless Traktor Installation"
+        }
+    }
+}
+
 enum AudioRole: String, CaseIterable, Identifiable, Hashable {
     case master = "Master"
     case drums = "Drums"

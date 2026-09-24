@@ -202,12 +202,12 @@ struct ContentView: View {
             guideRow(
                 icon: "shippingbox.fill",
                 title: "AAC Stem File",
-                detail: "The easiest workflow. No Traktor preparation is required. Create one shareable 320 kbps AAC .stem.mp4, then drag that finished file directly into Traktor. Its four stems are already packaged inside."
+                detail: "The easiest workflow. No Traktor preparation is required. Create one shareable 320 kbps AAC .stem.mp4, then drag that finished file directly into Traktor. Traktor treats it as a new track, so cues, beat grids, loops and play history from a separate master entry do not transfer automatically."
             )
             guideRow(
                 icon: "waveform.badge.checkmark",
                 title: "Lossless Traktor Installation",
-                detail: "Start by adding the exact stereo master to this app. You may add the four stems at the same time—individually or with Import Folder—or add them later. If the master is already analyzed in Traktor, the app detects it and skips the import step. Otherwise the app opens Traktor and highlights the master in Finder. Drag it into Traktor’s Track Collection—not onto a deck—and let analysis finish. The orange button always shows the next required action."
+                detail: "Add the exact stereo master file. The app checks the selected Traktor collection for that file. If it is already analyzed, the stems are linked to its existing entry without replacing the master or removing its cues, beat grid, loops or other Traktor data. Otherwise the app opens Traktor and highlights the master in Finder. Drag it into Track Collection—not onto a deck—and let analysis finish."
             )
 
             VStack(alignment: .leading, spacing: 7) {
@@ -227,7 +227,7 @@ struct ContentView: View {
             .background(Color.orange.opacity(0.07))
             .overlay(Rectangle().stroke(Color.orange.opacity(0.2)))
 
-            Text("Important: use the same master file in both Traktor and this app. A different copy may create a separate library entry and will not inherit the original track’s cues or beat grid.")
+            Text("Important: matching uses the master’s exact saved file location, not an audio fingerprint. Use the same file in Traktor and this app. A copy stored elsewhere may create a separate entry and will not inherit the original track’s cues or beat grid.")
                 .font(.system(size: 10))
                 .foregroundStyle(Color.orange.opacity(0.9))
                 .padding(10)
@@ -355,12 +355,20 @@ struct ContentView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(Color.white.opacity(0.4))
                 .frame(width: 78, alignment: .trailing)
-            Text(url?.path(percentEncoded: false) ?? emptyText)
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(url == nil ? Color.white.opacity(0.32) : Color.white.opacity(0.72))
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(url?.path(percentEncoded: false) ?? emptyText)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(url == nil ? Color.white.opacity(0.32) : Color.white.opacity(0.72))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if url != nil && !model.locationExists(url) {
+                    Text("DRIVE OR FOLDER UNAVAILABLE")
+                        .font(.system(size: 8, weight: .bold))
+                        .tracking(0.5)
+                        .foregroundStyle(Color.orange)
+                }
+            }
             Button("CHOOSE", action: action)
                 .font(.system(size: 9, weight: .semibold))
         }
@@ -384,7 +392,7 @@ struct ContentView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("v0.6.0-beta.12")
+                Text("v0.6.0-beta.13")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.62))
                 Text("AAC + VERIFIED LOSSLESS")
@@ -591,9 +599,18 @@ struct ContentView: View {
                 .foregroundStyle(Color.white.opacity(0.32))
             Spacer()
             if case .complete = model.state {
-                Button("SHOW IN FINDER") { model.revealOutput() }
-            }
-            if model.mode == .portableAAC || model.nativeReadiness?.ready == true {
+                if model.mode == .portableAAC {
+                    Button("OPEN TRAKTOR") { model.openTraktor() }
+                        .buttonStyle(.bordered)
+                    Button("SHOW STEM FILE IN FINDER") { model.revealOutput() }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.orange)
+                } else {
+                    Button("SHOW INSTALLED STEM IN FINDER") { model.revealOutput() }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.orange)
+                }
+            } else if model.mode == .portableAAC || model.nativeReadiness?.ready == true {
                 Button(model.primaryActionTitle) {
                     Task { await model.create() }
                 }

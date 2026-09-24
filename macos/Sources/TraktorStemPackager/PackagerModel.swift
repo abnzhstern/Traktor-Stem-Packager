@@ -3,6 +3,12 @@ import Foundation
 
 @MainActor
 final class PackagerModel: ObservableObject {
+    static let startupWorkflowKey = "startupWorkflow"
+    static let lastUsedModeKey = "lastUsedPackagingMode"
+    static let collectionPathKey = "traktorCollectionPath"
+    static let stemsDirectoryPathKey = "traktorStemsDirectoryPath"
+    static let openTraktorAfterAACKey = "openTraktorAfterAACExport"
+
     enum State: Equatable {
         case waiting
         case validating
@@ -41,23 +47,49 @@ final class PackagerModel: ObservableObject {
 
     init() {
         let manager = FileManager.default
+        let defaults = UserDefaults.standard
         let home = manager.homeDirectoryForCurrentUser
+        let startup = StartupWorkflow(rawValue: defaults.string(forKey: Self.startupWorkflowKey) ?? "") ?? .rememberLastUsed
+        switch startup {
+        case .rememberLastUsed:
+            mode = PackagingMode(rawValue: defaults.string(forKey: Self.lastUsedModeKey) ?? "") ?? .portableAAC
+        case .portableAAC:
+            mode = .portableAAC
+        case .nativeLossless:
+            mode = .nativeLossless
+        }
+
+        if let savedCollection = defaults.string(forKey: Self.collectionPathKey), !savedCollection.isEmpty {
+            collectionURL = URL(fileURLWithPath: savedCollection)
+        } else {
+            collectionURL = Self.detectCollection(home: home, manager: manager)
+        }
+        if let savedStems = defaults.string(forKey: Self.stemsDirectoryPathKey), !savedStems.isEmpty {
+            stemsDirectoryURL = URL(fileURLWithPath: savedStems, isDirectory: true)
+        } else {
+            stemsDirectoryURL = Self.detectStemsDirectory(home: home, manager: manager)
+        }
+        refreshTraktorStatus()
+    }
+
+    private static func detectCollection(home: URL, manager: FileManager) -> URL? {
         let nativeInstruments = home.appending(path: "Documents/Native Instruments")
-        if let folders = try? manager.contentsOfDirectory(
+        guard let folders = try? manager.contentsOfDirectory(
             at: nativeInstruments,
             includingPropertiesForKeys: [.contentModificationDateKey],
             options: [.skipsHiddenFiles]
-        ) {
-            collectionURL = folders
-                .filter { $0.lastPathComponent.hasPrefix("Traktor ") }
-                .map { $0.appending(path: "collection.nml") }
-                .filter { manager.fileExists(atPath: $0.path) }
-                .sorted { $0.deletingLastPathComponent().lastPathComponent > $1.deletingLastPathComponent().lastPathComponent }
-                .first
-        }
-        let defaultStems = home.appending(path: "Music/Traktor/Stems")
-        if manager.fileExists(atPath: defaultStems.path) { stemsDirectoryURL = defaultStems }
-        refreshTraktorStatus()
+        ) else { return nil }
+        return folders
+            .filter { $0.lastPathComponent.hasPrefix("Traktor ") }
+            .map { $0.appending(path: "collection.nml") }
+            .filter { manager.fileExists(atPath: $0.path) }
+            .sorted { $0.deletingLastPathComponent().lastPathComponent > $1.deletingLastPathComponent().lastPathComponent }
+            .first
+    }
+
+    private static func detectStemsDirectory(home: URL, manager: FileManager) -> URL? {
+        let defaultStems = home.appending(path: "Music/Traktor/Stems", directoryHint: .isDirectory)
+        return manager.fileExists(atPath: defaultStems.path) ? defaultStems : nil
     }
 
     var hasAllFiles: Bool { AudioRole.allCases.allSatisfy { files[$0] != nil } }
@@ -88,6 +120,7 @@ final class PackagerModel: ObservableObject {
 
     func setMode(_ newMode: PackagingMode) {
         mode = newMode
+        UserDefaults.standard.set(newMode.rawValue, forKey: Self.lastUsedModeKey)
         report = nil
         validationProblemRoles = []
         recoveryText = nil
@@ -257,12 +290,38 @@ final class PackagerModel: ObservableObject {
 
     func setCollection(_ url: URL?) {
         collectionURL = url
+        if let url {
+            UserDefaults.standard.set(url.path, forKey: Self.collectionPathKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: Self.collectionPathKey)
+        }
         refreshNativeReadiness()
     }
 
     func setStemsDirectory(_ url: URL?) {
         stemsDirectoryURL = url
+        if let url {
+            UserDefaults.standard.set(url.path, forKey: Self.stemsDirectoryPathKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: Self.stemsDirectoryPathKey)
+        }
         refreshNativeReadiness()
+    }
+
+    func resetDetectedLocations() {
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: Self.collectionPathKey)
+        defaults.removeObject(forKey: Self.stemsDirectoryPathKey)
+        let manager = FileManager.default
+        let home = manager.homeDirectoryForCurrentUser
+        collectionURL = Self.detectCollection(home: home, manager: manager)
+        stemsDirectoryURL = Self.detectStemsDirectory(home: home, manager: manager)
+        refreshNativeReadiness()
+    }
+
+    func locationExists(_ url: URL?) -> Bool {
+        guard let url else { return false }
+        return FileManager.default.fileExists(atPath: url.path)
     }
 
     func refreshTraktorStatus() {
@@ -547,7 +606,10 @@ final class PackagerModel: ObservableObject {
             }
             state = .complete(destination)
             statusText = "AAC Stem file created. Drag the finished .stem.mp4 directly into Traktor; all four stems are already inside."
-            recoveryText = "Choose Show in Finder, then drag the .stem.mp4 into Traktor’s Track Collection or a deck."
+            recoveryText = "Choose Show Stem File in Finder, then drag the .stem.mp4 into Traktor’s Track Collection or a deck. This new file does not automatically inherit cues or beat grids from a separate master entry."
+            if UserDefaults.standard.bool(forKey: Self.openTraktorAfterAACKey) {
+                openTraktor()
+            }
         } catch {
             state = .failed(error.localizedDescription)
             statusText = error.localizedDescription
@@ -745,6 +807,21 @@ final class PackagerModel: ObservableObject {
     func openPrivacyAndSecurity() {
         let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy")!
         NSWorkspace.shared.open(settingsURL)
+    }
+
+    func openTraktor() {
+        guard let traktorURL = traktorApplicationURL() else {
+            let alert = NSAlert()
+            alert.messageText = "Traktor Pro 4 could not be found"
+            alert.informativeText = "Open Traktor manually, or place Traktor Pro 4.app in Applications or an Applications subfolder."
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+            return
+        }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.openApplication(at: traktorURL, configuration: configuration) { _, _ in }
     }
 
     private func traktorApplicationURL() -> URL? {

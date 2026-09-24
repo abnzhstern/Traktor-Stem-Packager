@@ -6,7 +6,7 @@ This app does not create or separate stems. Start with four stems you already
 created or received, plus the matching stereo master.
 
 Before testing:
-1. Confirm the app title bar says v0.6.0-beta.12, then select
+1. Confirm the app title bar says v0.6.0-beta.13, then select
    “Lossless Traktor Installation.”
 2. Choose the collection.nml used by that Traktor installation.
 3. Choose the Stems folder configured in Traktor Pro 4 Preferences.
