@@ -6,6 +6,13 @@ WHAT THIS APP IS
 
 Traktor Stem Packager does not create or separate stems. It packages four stems you already created or received from a producer, composer, label, or stem-separation service, together with the matching stereo master.
 
+CHOOSE ONE OF TWO WORKFLOWS
+
+1. AAC Stem File creates one simple, shareable 320 kbps AAC .stem.mp4.
+2. Lossless Traktor Installation preserves the source PCM and links the stems to the existing Traktor master entry.
+
+In the app, orange always marks the one action to take next. Blue explains the current step, green means ready or complete, and red identifies a problem that must be corrected.
+
 AAC STEM FILE WORKFLOW
 
 The AAC workflow creates one shareable .stem.mp4 file. Drag that finished .stem.mp4 directly into Traktor's Track Collection or a deck; the four packaged stems will be present automatically. No master-track analysis or linked-folder setup is required for this workflow. Traktor treats the finished .stem.mp4 as a new track, so cues, beat grids, loops, and play history from a separate stereo-master entry do not transfer automatically.

@@ -88,6 +88,7 @@ struct ContentView: View {
             Spacer(minLength: 0)
             if model.mode == .nativeLossless,
                model.files[.master] != nil,
+               !model.folderImportNeedsReview,
                model.state != .packaging {
                 VStack(alignment: .trailing, spacing: 6) {
                     if model.nativeReadiness?.ready == false {
@@ -129,13 +130,13 @@ struct ContentView: View {
         case .complete:
             return ("COMPLETE", model.statusText, "checkmark.circle.fill", .green)
         case .failed:
-            return ("ACTION NEEDED", model.statusText, "exclamationmark.triangle.fill", .orange)
+            return ("ACTION NEEDED", model.statusText, "exclamationmark.triangle.fill", .red)
         default:
             break
         }
 
         if model.folderImportNeedsReview {
-            return ("REVIEW ASSIGNMENTS", "Check all five slots. Drag any file onto another slot to reassign it, then choose Accept Assignments.", "hand.draw.fill", .orange)
+            return ("REVIEW ASSIGNMENTS", "Check all five slots. Drag any file onto another slot to reassign it, then choose Accept Assignments.", "hand.draw.fill", .blue)
         }
 
         if model.mode == .portableAAC {
@@ -158,12 +159,12 @@ struct ContentView: View {
             if model.traktorRunning {
                 return ("NEXT ACTION", model.canResolveUnsavedAnalysis
                     ? "Let Traktor finish analyzing the stereo master. Then choose Close Traktor & Install. The app will close Traktor, verify the saved analysis, install the stems, and reopen Traktor."
-                    : "Let Traktor finish analyzing the stereo master. Then choose Close Traktor & Check Master. The app will close Traktor, verify the saved analysis, and reopen it.", "arrow.right.circle.fill", .orange)
+                    : "Let Traktor finish analyzing the stereo master. Then choose Close Traktor & Check Master. The app will close Traktor, verify the saved analysis, and reopen it.", "arrow.right.circle.fill", .blue)
             }
-            return ("STEP 3", "Traktor must analyze the exact stereo master before lossless stems can be installed. Choose Open Traktor & Show Master, then drag the highlighted file into Track Collection—not onto a deck.", "3.circle.fill", .orange)
+            return ("STEP 3", "Traktor must analyze the exact stereo master before lossless stems can be installed. Choose Open Traktor & Show Master, then drag the highlighted file into Track Collection—not onto a deck.", "3.circle.fill", .blue)
         }
         if model.traktorRunning && model.hasAllFiles {
-            return ("READY TO VERIFY", "Traktor is open, so its current library state may not be saved yet. Choose Close Traktor & Verify / Install. The app will save and recheck the latest collection before changing anything.", "checkmark.circle.fill", .orange)
+            return ("READY TO VERIFY", "Traktor is open, so its current library state may not be saved yet. Choose Close Traktor & Verify / Install. The app will save and recheck the latest collection before changing anything.", "checkmark.circle.fill", .blue)
         }
         if !model.hasAllFiles {
             return ("STEP 4", "The analyzed master was found. Add the remaining four stems or import their five-file folder.", "4.circle.fill", .blue)
@@ -172,72 +173,104 @@ struct ContentView: View {
     }
 
     private var workflowGuide: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(spacing: 12) {
-                Image(nsImage: NSApplication.shared.applicationIconImage)
-                    .resizable()
-                    .interpolation(.high)
-                    .frame(width: 58, height: 58)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("BEFORE YOU BEGIN")
-                        .font(.system(size: 16, weight: .bold))
-                        .tracking(0.8)
-                    Text("Choose the workflow that matches your goal.")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Color.white.opacity(0.55))
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(spacing: 12) {
+                        Image(nsImage: NSApplication.shared.applicationIconImage)
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: 58, height: 58)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("HOW TO USE TRAKTOR STEM PACKAGER")
+                                .font(.system(size: 16, weight: .bold))
+                                .tracking(0.6)
+                            Text("Choose one of the two workflows below.")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Color.white.opacity(0.72))
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("THIS APP PACKAGES EXISTING STEMS")
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(0.7)
+                        Text("It does not create or separate stems. Start with one stereo master and four matching stem files. Add them individually or use Import Folder.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.white.opacity(0.65))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(11)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.white.opacity(0.035))
+                    .overlay(Rectangle().stroke(Color.white.opacity(0.08)))
+
+                    Text("CHOOSE ONE OF TWO WORKFLOWS")
+                        .font(.system(size: 11, weight: .bold))
+                        .tracking(1.0)
+                        .foregroundStyle(Color.white.opacity(0.76))
+
+                    workflowGuideCard(
+                        number: "1",
+                        icon: "shippingbox.fill",
+                        accent: .cyan,
+                        title: "AAC STEM FILE",
+                        bestFor: "Choose this for the simplest, shareable Stem file.",
+                        result: "Creates one 320 kbps AAC .stem.mp4.",
+                        steps: [
+                            "Add the stereo master and four stems.",
+                            "Review the embedded title, artist, album and artwork.",
+                            "Create the file, then drag it directly into Traktor."
+                        ],
+                        note: "Traktor treats the finished file as a new track. Standard metadata is copied, but cues, beat grids, loops and play history from a separate master entry do not transfer automatically."
+                    )
+
+                    workflowGuideCard(
+                        number: "2",
+                        icon: "waveform.badge.checkmark",
+                        accent: Color(red: 0.82, green: 0.20, blue: 0.96),
+                        title: "LOSSLESS TRAKTOR INSTALLATION",
+                        bestFor: "Choose this to preserve source PCM and keep the existing Traktor master entry.",
+                        result: "Creates a linked lossless Stem file for the original master.",
+                        steps: [
+                            "Add the exact stereo master and four stems.",
+                            "If needed, the app walks you through importing and analyzing that master in Track Collection.",
+                            "Follow the single orange action. The app verifies Traktor’s saved collection, installs the stems and reopens Traktor."
+                        ],
+                        note: "Select the same master file that Traktor analyzed. The existing entry—and its cues, beat grid, loops and other Traktor data—is preserved. A duplicate stored in another folder may be treated as a different track."
+                    )
+
+                    HStack(spacing: 9) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.orange)
+                            .frame(width: 18, height: 10)
+                        Text("In the main window, orange always marks the one action to take next.")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.7))
+                    }
+                    .padding(.horizontal, 2)
+
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("ONE-TIME MAC SECURITY SETUP")
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(0.6)
+                        Text("This free build is not Apple-notarized. If macOS blocks the app from closing Traktor, allow Traktor Stem Packager under System Settings > Privacy & Security > Automation. If permission is unavailable, the app explains the manual fallback.")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.white.opacity(0.62))
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button("OPEN PRIVACY & SECURITY") { model.openPrivacyAndSecurity() }
+                            .font(.system(size: 9, weight: .semibold))
+                            .buttonStyle(.bordered)
+                    }
+                    .padding(11)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.white.opacity(0.035))
+                    .overlay(Rectangle().stroke(Color.white.opacity(0.08)))
                 }
+                .padding(22)
             }
 
-            VStack(alignment: .leading, spacing: 5) {
-                Text("THIS APP PACKAGES EXISTING STEMS FOR TRAKTOR")
-                    .font(.system(size: 11, weight: .bold))
-                    .tracking(0.6)
-                Text("It does not separate a finished song or create stems. Use four stems you created yourself or received from a producer, composer, label, or stem-separation service, plus the matching stereo master. Add them individually or use Import Folder to auto-assign a five-file folder for review.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Color.white.opacity(0.68))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.blue.opacity(0.08))
-            .overlay(Rectangle().stroke(Color.blue.opacity(0.22)))
-
-            guideRow(
-                icon: "shippingbox.fill",
-                title: "AAC Stem File",
-                detail: "The easiest workflow. No Traktor preparation is required. Create one shareable 320 kbps AAC .stem.mp4, then drag that finished file directly into Traktor. Traktor treats it as a new track, so cues, beat grids, loops and play history from a separate master entry do not transfer automatically."
-            )
-            guideRow(
-                icon: "waveform.badge.checkmark",
-                title: "Lossless Traktor Installation",
-                detail: "Add the exact stereo master file. The app checks the selected Traktor collection for that file. If it is already analyzed, the stems are linked to its existing entry without replacing the master or removing its cues, beat grid, loops or other Traktor data. Otherwise the app opens Traktor and highlights the master in Finder. Drag it into Track Collection—not onto a deck—and let analysis finish."
-            )
-
-            VStack(alignment: .leading, spacing: 7) {
-                Text("ONE-TIME MAC SECURITY SETUP")
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(0.6)
-                Text("This free build is not Apple-notarized. If macOS blocks the app from closing Traktor, open System Settings > Privacy & Security and allow Traktor Stem Packager under Automation if it appears. App Management permission for Terminal or the installer is needed only when installing or replacing the app. If permission is denied, the app will pause and explain how to continue manually.")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Color.white.opacity(0.68))
-                    .fixedSize(horizontal: false, vertical: true)
-                Button("OPEN PRIVACY & SECURITY") { model.openPrivacyAndSecurity() }
-                    .font(.system(size: 9, weight: .semibold))
-                    .buttonStyle(.bordered)
-            }
-            .padding(11)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.orange.opacity(0.07))
-            .overlay(Rectangle().stroke(Color.orange.opacity(0.2)))
-
-            Text("IMPORTANT FOR LOSSLESS: Select the same stereo master file that Traktor analyzed. The app attaches the stems to that file’s existing Traktor library entry, preserving its cues and beat grid. If you select a duplicate copy from another folder, Traktor may treat it as a different track.")
-                .font(.system(size: 10))
-                .foregroundStyle(Color.orange.opacity(0.9))
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.orange.opacity(0.08))
-                .overlay(Rectangle().stroke(Color.orange.opacity(0.22)))
-
+            Divider().overlay(Color.white.opacity(0.08))
             HStack {
                 Button(hideWorkflowGuideOnLaunch ? "SHOW AT LAUNCH" : "DON’T SHOW AGAIN") {
                     if hideWorkflowGuideOnLaunch {
@@ -263,36 +296,75 @@ struct ContentView: View {
                 .keyboardShortcut(.defaultAction)
                 .keyboardShortcut(.cancelAction)
             }
+            .padding(.horizontal, 22)
+            .frame(height: 58)
+            .background(Color(red: 0.11, green: 0.115, blue: 0.13))
         }
-        .padding(24)
-        .frame(width: 590)
+        .frame(width: 640, height: 720)
         .background(background)
         .preferredColorScheme(.dark)
     }
 
-    private func guideRow(icon: String, title: String, detail: String) -> some View {
-        HStack(alignment: .top, spacing: 13) {
-            Image(systemName: icon)
-                .font(.system(size: 20))
-                .foregroundStyle(Color.white.opacity(0.8))
-                .frame(width: 28)
-            VStack(alignment: .leading, spacing: 5) {
+    private func workflowGuideCard(
+        number: String,
+        icon: String,
+        accent: Color,
+        title: String,
+        bestFor: String,
+        result: String,
+        steps: [String],
+        note: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(spacing: 10) {
+                Text(number)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Color.black.opacity(0.85))
+                    .frame(width: 26, height: 26)
+                    .background(Circle().fill(accent))
+                Image(systemName: icon)
+                    .font(.system(size: 17))
+                    .foregroundStyle(accent)
                 Text(title)
-                    .font(.system(size: 13, weight: .semibold))
-                Text(detail)
-                    .font(.system(size: 11))
-                    .foregroundStyle(Color.white.opacity(0.55))
-                    .fixedSize(horizontal: false, vertical: true)
+                    .font(.system(size: 13, weight: .bold))
+                    .tracking(0.5)
+                Spacer()
             }
+            Text(bestFor)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.82))
+            Text(result)
+                .font(.system(size: 11))
+                .foregroundStyle(accent.opacity(0.9))
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
+                    HStack(alignment: .top, spacing: 8) {
+                        Text("\(index + 1).")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(accent)
+                            .frame(width: 15, alignment: .trailing)
+                        Text(step)
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.white.opacity(0.66))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            Divider().overlay(accent.opacity(0.18))
+            Text(note)
+                .font(.system(size: 9.5))
+                .foregroundStyle(Color.white.opacity(0.5))
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(13)
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(panel)
+        .background(accent.opacity(0.055))
+        .overlay(Rectangle().stroke(accent.opacity(0.28), lineWidth: 1))
     }
 
     private var modePanel: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("CHOOSE YOUR RESULT")
+            Text("CHOOSE ONE WORKFLOW")
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(1.0)
                 .foregroundStyle(Color.white.opacity(0.45))
@@ -369,7 +441,7 @@ struct ContentView: View {
                     Text("DRIVE OR FOLDER UNAVAILABLE")
                         .font(.system(size: 8, weight: .bold))
                         .tracking(0.5)
-                        .foregroundStyle(Color.orange)
+                        .foregroundStyle(Color.red)
                 }
             }
             Button("CHOOSE", action: action)
@@ -395,13 +467,13 @@ struct ContentView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("v0.6.0-beta.14")
+                Text("v0.6.0-beta.15")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.62))
                 Text("AAC + VERIFIED LOSSLESS")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.35))
-                Button("HOW IT WORKS") { showWorkflowGuide = true }
+                Button("HOW TO USE") { showWorkflowGuide = true }
                     .buttonStyle(.plain)
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(Color.white.opacity(0.55))
@@ -479,7 +551,7 @@ struct ContentView: View {
                 if model.folderImportNeedsReview {
                     Text("REVIEW • DRAG TO REASSIGN")
                         .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(Color.orange)
+                        .foregroundStyle(Color.blue)
                     Button("ACCEPT ASSIGNMENTS") { model.confirmFolderAssignments() }
                         .font(.system(size: 9, weight: .semibold))
                         .buttonStyle(.borderedProminent)
@@ -576,12 +648,12 @@ struct ContentView: View {
                 Divider().overlay(Color.white.opacity(0.08))
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "wrench.and.screwdriver.fill")
-                        .foregroundStyle(Color.orange.opacity(0.9))
+                        .foregroundStyle(Color.blue.opacity(0.9))
                     VStack(alignment: .leading, spacing: 3) {
                         Text("WHAT TO DO NEXT")
                             .font(.system(size: 9, weight: .bold))
                             .tracking(0.8)
-                            .foregroundStyle(Color.orange.opacity(0.9))
+                            .foregroundStyle(Color.blue.opacity(0.9))
                         Text(recovery)
                             .font(.system(size: 11))
                             .foregroundStyle(Color.white.opacity(0.68))
@@ -607,11 +679,11 @@ struct ContentView: View {
                         .buttonStyle(.bordered)
                     Button("SHOW STEM FILE IN FINDER") { model.revealOutput() }
                         .buttonStyle(.borderedProminent)
-                        .tint(.orange)
+                        .tint(.green)
                 } else {
                     Button("SHOW INSTALLED STEM IN FINDER") { model.revealOutput() }
                         .buttonStyle(.borderedProminent)
-                        .tint(.orange)
+                        .tint(.green)
                 }
             } else if model.mode == .portableAAC || model.nativeReadiness?.ready == true {
                 Button(model.primaryActionTitle) {

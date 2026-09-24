@@ -59,8 +59,9 @@ jobs:
           test -f "$APP/Contents/Resources/AppIcon.icns"
           test "$(plutil -extract CFBundleDisplayName raw "$APP/Contents/Info.plist")" = "Traktor Stem Packager"
           test "$(plutil -extract CFBundleIconFile raw "$APP/Contents/Info.plist")" = "AppIcon"
-          test "$(plutil -extract CFBundleShortVersionString raw "$APP/Contents/Info.plist")" = "0.6.0-beta.14"
-          grep -F 'Text("v0.6.0-beta.14")' macos/Sources/TraktorStemPackager/ContentView.swift
+          test "$(plutil -extract CFBundleShortVersionString raw "$APP/Contents/Info.plist")" = "0.6.0-beta.15"
+          grep -F 'Text("v0.6.0-beta.15")' macos/Sources/TraktorStemPackager/ContentView.swift
+          grep -F 'Text("CHOOSE ONE OF TWO WORKFLOWS")' macos/Sources/TraktorStemPackager/ContentView.swift
           grep -F 'case .rememberLastUsed: "Remember Last Used"' macos/Sources/TraktorStemPackager/AudioRole.swift
           grep -F 'case .nativeLossless: "Lossless Traktor Installation"' macos/Sources/TraktorStemPackager/AudioRole.swift
           codesign --verify --deep --strict "$APP"
@@ -79,15 +80,15 @@ jobs:
           cp "macos/installer/README.txt" "$DIST/"
           cp "macos/installer/LOSSLESS-TEST-NOTES.txt" "$DIST/"
           chmod +x "$DIST/Install Traktor Stem Packager.command"
-          ditto -c -k --sequesterRsrc --keepParent "$DIST" "Traktor-Stem-Packager-0.6.0-beta.14-dual-mode-test.zip"
-          shasum -a 256 "Traktor-Stem-Packager-0.6.0-beta.14-dual-mode-test.zip" > "Traktor-Stem-Packager-0.6.0-beta.14-dual-mode-test.zip.sha256"
+          ditto -c -k --sequesterRsrc --keepParent "$DIST" "Traktor-Stem-Packager-0.6.0-beta.15-dual-mode-test.zip"
+          shasum -a 256 "Traktor-Stem-Packager-0.6.0-beta.15-dual-mode-test.zip" > "Traktor-Stem-Packager-0.6.0-beta.15-dual-mode-test.zip.sha256"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Traktor-Stem-Packager-0.6.0-beta.14-dual-mode-test
+          name: Traktor-Stem-Packager-0.6.0-beta.15-dual-mode-test
           path: |
-            Traktor-Stem-Packager-0.6.0-beta.14-dual-mode-test.zip
-            Traktor-Stem-Packager-0.6.0-beta.14-dual-mode-test.zip.sha256
+            Traktor-Stem-Packager-0.6.0-beta.15-dual-mode-test.zip
+            Traktor-Stem-Packager-0.6.0-beta.15-dual-mode-test.zip.sha256
           if-no-files-found: error
           retention-days: 14

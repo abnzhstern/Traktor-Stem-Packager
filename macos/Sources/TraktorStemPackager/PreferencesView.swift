@@ -46,7 +46,7 @@ struct PreferencesView: View {
                 if url != nil && !model.locationExists(url) {
                     Text("Drive or folder unavailable — reconnect it or choose another location.")
                         .font(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(.red)
                 }
             }
             Spacer()
