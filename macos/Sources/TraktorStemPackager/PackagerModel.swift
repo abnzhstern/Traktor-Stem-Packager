@@ -40,7 +40,7 @@ final class PackagerModel: ObservableObject {
     @Published var statusText = "Add your master and four stem files, or import a five-file folder."
     @Published var recoveryText: String?
     @Published var validationProblemRoles: Set<AudioRole> = []
-    @Published var folderImportNeedsReview = false
+    @Published var assignmentsNeedReview = false
     @Published private(set) var validationAccepted = false
     @Published var waitingForManualTraktorQuit = false
     private var extractedArtworkURL: URL?
@@ -95,7 +95,7 @@ final class PackagerModel: ObservableObject {
 
     var hasAllFiles: Bool { AudioRole.allCases.allSatisfy { files[$0] != nil } }
     var audioSetValidated: Bool { hasAllFiles && validationAccepted && report != nil }
-    var assignmentsLocked: Bool { audioSetValidated && !folderImportNeedsReview }
+    var assignmentsLocked: Bool { audioSetValidated && !assignmentsNeedReview }
     var canCreate: Bool {
         state == .ready && audioSetValidated &&
             (mode == .portableAAC || (collectionURL != nil && stemsDirectoryURL != nil && nativeReadiness?.ready == true))
@@ -122,9 +122,11 @@ final class PackagerModel: ObservableObject {
         validationProblemRoles = []
         recoveryText = nil
         state = .waiting
-        statusText = hasAllFiles ? "Checking compatibility…" : "Add your master and four stem files, or import a five-file folder."
+        assignmentsNeedReview = hasAllFiles
+        statusText = hasAllFiles
+            ? "Review the assignments, then choose Accept Assignments."
+            : "Add your master and four stem files, or import a five-file folder."
         refreshNativeReadiness()
-        if hasAllFiles && !folderImportNeedsReview { Task { await validate() } }
     }
 
     func setFile(_ url: URL, for role: AudioRole) {
@@ -143,15 +145,15 @@ final class PackagerModel: ObservableObject {
         validationProblemRoles = []
         recoveryText = nil
         state = .waiting
-        statusText = folderImportNeedsReview
+        assignmentsNeedReview = hasAllFiles
+        statusText = hasAllFiles
             ? "Review the assignments. Drag files between slots to reassign them, then choose Accept Assignments."
-            : hasAllFiles ? "Checking compatibility…" : "Add your master and four stem files, or import a five-file folder."
+            : "Add your master and four stem files, or import a five-file folder."
         if files[.master] != previousMaster, let master = files[.master] {
             title = master.deletingPathExtension().lastPathComponent
             Task { await loadMasterMetadata(from: master) }
             refreshNativeReadiness()
         }
-        if hasAllFiles && !folderImportNeedsReview { Task { await validate() } }
     }
 
     func importFolder(_ directory: URL) {
@@ -168,7 +170,7 @@ final class PackagerModel: ObservableObject {
                 .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
 
             guard audioFiles.count == 5 else {
-                folderImportNeedsReview = false
+                assignmentsNeedReview = false
                 validationProblemRoles = []
                 state = .failed("This folder contains \(audioFiles.count) supported audio files. Choose a folder containing exactly one master and four stems, or add the files manually.")
                 statusText = "This folder contains \(audioFiles.count) supported audio files. Choose a folder containing exactly one master and four stems, or add the files manually."
@@ -197,7 +199,7 @@ final class PackagerModel: ObservableObject {
             validationAccepted = false
             validationProblemRoles = []
             recoveryText = nil
-            folderImportNeedsReview = true
+            assignmentsNeedReview = true
             state = .waiting
             statusText = "Review the assignments. Drag files between slots to reassign them, then choose Accept Assignments."
             if let master = files[.master] {
@@ -206,23 +208,23 @@ final class PackagerModel: ObservableObject {
             }
             refreshNativeReadiness()
         } catch {
-            folderImportNeedsReview = false
+            assignmentsNeedReview = false
             state = .failed("The folder could not be read. Choose it again or add the files manually.")
             statusText = "The folder could not be read. Choose it again or add the files manually."
             recoveryText = "Check that the folder still exists and is readable, then choose it again or add the files individually."
         }
     }
 
-    func confirmFolderAssignments() {
-        guard folderImportNeedsReview, hasAllFiles else { return }
-        folderImportNeedsReview = false
+    func confirmAssignments() {
+        guard assignmentsNeedReview, hasAllFiles else { return }
+        assignmentsNeedReview = false
         statusText = "Checking compatibility…"
         Task { await validate() }
     }
 
     func editAssignments() {
         guard hasAllFiles else { return }
-        folderImportNeedsReview = true
+        assignmentsNeedReview = true
         report = nil
         validationAccepted = false
         validationProblemRoles = []
@@ -251,7 +253,7 @@ final class PackagerModel: ObservableObject {
         validationAccepted = false
         validationProblemRoles = []
         recoveryText = nil
-        folderImportNeedsReview = false
+        assignmentsNeedReview = false
         state = .waiting
         statusText = "Add your master and four stem files, or import a five-file folder."
         if role == .master {
@@ -275,7 +277,7 @@ final class PackagerModel: ObservableObject {
         validationAccepted = false
         nativeReadiness = nil
         validationProblemRoles = []
-        folderImportNeedsReview = false
+        assignmentsNeedReview = false
         waitingForManualTraktorQuit = false
         recoveryText = nil
         state = .waiting
@@ -783,15 +785,15 @@ final class PackagerModel: ObservableObject {
         }
 
         let prompt = NSAlert()
-        prompt.messageText = "macOS did not allow Traktor to close automatically"
-        prompt.informativeText = "Choose Open Automation Settings. In Privacy & Security > Automation, enable Traktor Stem Packager if it appears, then return here and quit Traktor normally. The app will detect the closure and continue automatically. If no Automation entry appears, use the manual option—no files have been changed."
+        prompt.messageText = "Traktor is still open"
+        prompt.informativeText = "No macOS Automation permission is required. Choose Bring Traktor Forward, then quit Traktor normally with Traktor Pro > Quit Traktor Pro 4 or Command-Q. Leave Traktor Stem Packager open; it will detect the closure and continue automatically. No files have been changed."
         prompt.alertStyle = .warning
-        prompt.addButton(withTitle: "Open Automation Settings")
-        prompt.addButton(withTitle: "I’ll Quit Traktor")
-        prompt.addButton(withTitle: "Cancel")
+        prompt.addButton(withTitle: "Bring Traktor Forward")
+        prompt.addButton(withTitle: "I’ll Quit It Now")
+        prompt.addButton(withTitle: "Cancel Installation")
         let choice = prompt.runModal()
         if choice == .alertFirstButtonReturn {
-            openAutomationSettings()
+            _ = application.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
         } else if choice == .alertThirdButtonReturn {
             waitingForManualTraktorQuit = false
             state = .ready
@@ -825,10 +827,6 @@ final class PackagerModel: ObservableObject {
     func openPrivacyAndSecurity() {
         let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy")!
         NSWorkspace.shared.open(settingsURL)
-    }
-
-    func openAutomationSettings() {
-        openPrivacyPane(anchor: "Privacy_Automation")
     }
 
     func openAppManagementSettings() {

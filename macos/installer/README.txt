@@ -80,9 +80,11 @@ Traktor must close before the app edits collection.nml. Follow the orange next-a
 
 MAC PRIVACY & SECURITY
 
-This free build is not Apple-notarized. The app's How to Use page separates the first-launch, App Management, and Automation steps and includes buttons for the relevant Privacy & Security sections. If macOS blocks the app from closing Traktor, enable Traktor Stem Packager under Automation if it appears. If permission remains unavailable, the app pauses and walks you through quitting Traktor manually, then continues automatically.
+This free build is not Apple-notarized. Only open a Privacy & Security section after macOS displays the matching warning. Opening a settings pane does not create a permission entry by itself.
 
-App Management permission for Terminal or the installer is separate. It is needed only when installing or replacing Traktor Stem Packager in the Applications folder. Manually closing Traktor does not affect that installation notice.
+If the installer says Terminal was prevented from modifying apps, open App Management and enable Terminal. Terminal may not appear there until macOS has actually blocked an installation attempt. This permission is needed only when installing or replacing Traktor Stem Packager in the Applications folder.
+
+Closing Traktor does not require Automation permission. The app first sends Traktor a normal quit request. If Traktor remains open, the app brings it forward and asks you to quit it with Traktor Pro > Quit Traktor Pro 4 or Command-Q. Keep Traktor Stem Packager open; it detects the closure and continues automatically.
 
 Open Traktor / Bring Traktor Forward remains available in the app header as a neutral convenience control. Orange is reserved for the required next workflow action.
 

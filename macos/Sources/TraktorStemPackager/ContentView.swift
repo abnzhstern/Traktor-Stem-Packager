@@ -88,7 +88,7 @@ struct ContentView: View {
             Spacer(minLength: 0)
             if model.mode == .nativeLossless,
                model.files[.master] != nil,
-               !model.folderImportNeedsReview,
+               !model.assignmentsNeedReview,
                model.state != .packaging {
                 VStack(alignment: .trailing, spacing: 6) {
                     if model.nativeReadiness?.ready == false {
@@ -135,7 +135,7 @@ struct ContentView: View {
             break
         }
 
-        if model.folderImportNeedsReview {
+        if model.assignmentsNeedReview {
             return ("REVIEW ASSIGNMENTS", "Check all five slots. Drag any file onto another slot to reassign it, then choose Accept Assignments.", "hand.draw.fill", .blue)
         }
 
@@ -255,17 +255,16 @@ struct ContentView: View {
                         Text("ONE-TIME MAC SECURITY SETUP")
                             .font(.system(size: 10, weight: .bold))
                             .tracking(0.6)
-                        Text("This free build is not Apple-notarized. Most users only need these steps once, and only when macOS displays the corresponding warning.")
+                        Text("This free build is not Apple-notarized. Only use a settings button after macOS displays the matching warning; opening a pane by itself does not create a permission entry.")
                             .font(.system(size: 10))
                             .foregroundStyle(Color.white.opacity(0.62))
                             .fixedSize(horizontal: false, vertical: true)
                         securityStep("1", "If macOS blocks the first launch, open Privacy & Security, scroll to Security, choose Open Anyway, then confirm Open.")
-                        securityStep("2", "If macOS says an app was prevented from modifying apps, open App Management and enable Terminal or Traktor Stem Packager—whichever macOS names in the warning.")
-                        securityStep("3", "If automatic Traktor closing is blocked, open Automation and enable Traktor Stem Packager. If it is not listed, quit Traktor normally; the app will detect it and continue.")
+                        securityStep("2", "If the installer says Terminal was prevented from modifying apps, open App Management and enable Terminal. Terminal may not appear until macOS has actually blocked an installation attempt.")
+                        securityStep("3", "Closing Traktor does not require Automation permission. The app first asks Traktor to quit normally. If Traktor stays open, press Command-Q in Traktor; this app detects the closure and continues.")
                         HStack(spacing: 8) {
                             Button("GENERAL SECURITY") { model.openPrivacyAndSecurity() }
-                            Button("APP MANAGEMENT") { model.openAppManagementSettings() }
-                            Button("AUTOMATION") { model.openAutomationSettings() }
+                            Button("APP MANAGEMENT — ONLY IF PROMPTED") { model.openAppManagementSettings() }
                         }
                         .font(.system(size: 9, weight: .semibold))
                         .buttonStyle(.bordered)
@@ -489,17 +488,30 @@ struct ContentView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("v0.6.0-beta.17")
+                Text("v0.6.0-beta.18")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.62))
                 Text("AAC + VERIFIED LOSSLESS")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.35))
-                HStack(spacing: 10) {
-                    Button(model.traktorRunning ? "BRING TRAKTOR FORWARD" : "OPEN TRAKTOR") {
-                        model.openTraktor()
+                HStack(spacing: 12) {
+                    Button { model.openTraktor() } label: {
+                        Label(
+                            model.traktorRunning ? "BRING TRAKTOR FORWARD" : "OPEN TRAKTOR",
+                            systemImage: "play.rectangle.fill"
+                        )
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Color.white)
+                        .padding(.horizontal, 10)
+                        .frame(height: 25)
+                        .background(Color.black)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 5)
+                                .stroke(Color.white.opacity(0.32), lineWidth: 1)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 5))
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.plain)
                     Button("HOW TO USE") { showWorkflowGuide = true }
                         .buttonStyle(.plain)
                         .foregroundStyle(Color.white.opacity(0.55))
@@ -576,11 +588,11 @@ struct ContentView: View {
                     .tracking(1.0)
                     .foregroundStyle(Color.white.opacity(0.45))
                 Spacer()
-                if model.folderImportNeedsReview {
+                if model.assignmentsNeedReview {
                     Text("REVIEW • DRAG TO REASSIGN")
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(Color.blue)
-                    Button("ACCEPT ASSIGNMENTS") { model.confirmFolderAssignments() }
+                    Button("ACCEPT ASSIGNMENTS") { model.confirmAssignments() }
                         .font(.system(size: 9, weight: .semibold))
                         .buttonStyle(.borderedProminent)
                         .tint(Color.orange.opacity(0.8))
@@ -609,7 +621,7 @@ struct ContentView: View {
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(Color.white.opacity(0.32))
                 }
-                if !model.folderImportNeedsReview {
+                if !model.assignmentsNeedReview {
                     Button("IMPORT FOLDER") { chooseAudioFolder() }
                         .font(.system(size: 9, weight: .semibold))
                         .buttonStyle(.bordered)
