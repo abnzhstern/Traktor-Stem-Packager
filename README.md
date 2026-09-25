@@ -24,9 +24,12 @@ The current build supports **Apple Silicon Macs** running **macOS 14 or newer**.
 - Decodes and SHA-256 verifies every packaged lossless stream against its source before installation
 - Can ask Traktor to close so it saves its collection before installation, then relaunch it afterward; if Traktor remains open, the app provides a clear manual Command-Q fallback
 - Sends the exact selected master to Traktor, checks for its saved analysis ID, and always states the next required action
+- Monitors the saved Traktor collection and Stems folder, distinguishes linked state from file presence, and rechecks when Traktor saves or closes
+- Clearly warns when Traktor is open and recent in-memory changes may not yet be present in the saved collection
 - Rechecks Traktor automatically after closure; the internal collection check is not exposed as a confusing workflow button
 - Preserves the existing Traktor library entry so its cues, beat grid, loops, and other track data remain attached
 - Provides Start New Package (Command-N), drag-and-drop reassignment, accepted-assignment locking, and Edit Assignments
+- Remembers the last-used audio folder or lets the user choose a fixed starting folder in Preferences
 - Keeps a neutral Open Traktor / Bring Traktor Forward control available without competing with the orange next workflow action
 - Opens with a workflow guide explaining what the app does and walking through the selected workflow; users can choose **Don't Show Again** and reopen it later with **How It Works**
 - Highlights empty file slots, requires explicit assignment acceptance, verifies the complete audio set, and identifies incompatible files with a specific remedy

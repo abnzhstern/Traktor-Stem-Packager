@@ -13,6 +13,8 @@ CHOOSE ONE OF TWO WORKFLOWS
 
 In the app, orange always marks the one action to take next. Blue explains the current step, green means ready or complete, and red identifies a problem that must be corrected.
 
+Audio pickers remember the last folder used. In Preferences, Starting Audio Folder can instead be set to a fixed project or music folder.
+
 AAC STEM FILE WORKFLOW
 
 The AAC workflow creates one shareable .stem.mp4 file. Drag that finished .stem.mp4 directly into Traktor's Track Collection or a deck; the four packaged stems will be present automatically. No master-track analysis or linked-folder setup is required for this workflow. Traktor treats the finished .stem.mp4 as a new track, so cues, beat grids, loops, and play history from a separate stereo-master entry do not transfer automatically.
@@ -71,6 +73,8 @@ If the master is already analyzed in Traktor, add that exact same master file an
 If the master is not in Traktor, add the master and four stems to the app. The app walks you through importing and analyzing the master, then links the four lossless stems to it as a new track.
 
 Traktor saves additions and deletions to collection.nml when it closes. If Traktor is open, the app treats the on-disk collection as potentially out of date. Before every lossless installation, the app closes Traktor when necessary and rechecks the newly saved collection. It will not install anything unless the selected master is still present and analyzed. If the master is missing, the app highlights it in Finder and tells you to import it into Traktor's Track Collection.
+
+While the app is open, it monitors the saved collection and Stems folder and updates when Traktor writes changes. The Traktor Status line says SAVED STATE while Traktor is open because very recent changes may still exist only inside Traktor. Choose Refresh Traktor Status at any time; closing Traktor remains the definitive way to force its latest collection state to disk.
 
 Start by adding the exact stereo master to the app. You may add the four stems at the same time, individually or with Import Folder, or add them later. If the master is not already analyzed, choose Open Traktor & Show Master. The app opens Traktor and brings Finder to the foreground with the exact master highlighted. Drag it into Traktor's Track Collection, not onto a deck, and let analysis finish. Show Master in Finder remains available whenever a master is loaded.
 

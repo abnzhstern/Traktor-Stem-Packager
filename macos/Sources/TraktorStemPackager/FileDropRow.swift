@@ -8,24 +8,43 @@ struct FileDropRow: View {
     let isValidated: Bool
     let isLocked: Bool
     let hasProblem: Bool
-    let focusedRole: FocusState<AudioRole?>.Binding
     let select: (URL) -> Void
     let clear: () -> Void
 
     @State private var importing = false
     @State private var targeted = false
+    @State private var editingLabel = false
+    @FocusState private var labelFocused: Bool
 
     var body: some View {
         HStack(spacing: 0) {
             Group {
                 if role == .master {
                     Text("Master").font(.system(size: 13, weight: .semibold))
-                } else {
+                } else if editingLabel {
                     TextField(role.rawValue, text: $displayName)
-                        .focused(focusedRole, equals: role)
+                        .focused($labelFocused)
                         .textFieldStyle(.plain)
                         .font(.system(size: 13, weight: .semibold))
-                        .help("Editable display name. The internal stem role remains \(role.rawValue).")
+                        .onSubmit { finishEditingLabel() }
+                        .onAppear {
+                            DispatchQueue.main.async { labelFocused = true }
+                        }
+                } else {
+                    Button {
+                        editingLabel = true
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text(displayName)
+                                .font(.system(size: 13, weight: .semibold))
+                                .lineLimit(1)
+                            Image(systemName: "pencil")
+                                .font(.system(size: 8, weight: .semibold))
+                                .opacity(0.55)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .help("Edit the display name. The internal stem role remains \(role.rawValue).")
                 }
             }
             .foregroundStyle(role == .master ? Color.white.opacity(0.86) : Color.black.opacity(0.78))
@@ -89,6 +108,16 @@ struct FileDropRow: View {
                 return NSItemProvider(object: url as NSURL)
             }
         }
+        .onChange(of: labelFocused) { focused in
+            if !focused && editingLabel { finishEditingLabel() }
+        }
+    }
+
+    private func finishEditingLabel() {
+        let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        displayName = trimmed.isEmpty ? role.rawValue : trimmed
+        editingLabel = false
+        labelFocused = false
     }
 
     private var indicatorColor: Color {

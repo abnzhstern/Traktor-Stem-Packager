@@ -28,6 +28,7 @@ async function main() {
     found: result.found,
     hasAudioId: result.hasAudioId,
     linkedStemExists,
+    collectionLinked: result.collectionLinked,
     message: result.message,
   })}`);
 }

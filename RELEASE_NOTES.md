@@ -1,3 +1,13 @@
+# Version 0.6.0-beta.20
+
+- Added continuous monitoring of the saved Traktor collection and Stems folder while the app is open, plus a manual Refresh Traktor Status control.
+- The status distinguishes verified saved state from potentially unsaved changes while Traktor is open.
+- Detects the collection’s linked-stems flag separately from whether a Stem file merely exists, including a master that was unpaired inside Traktor.
+- Stem labels are now plain text until the user explicitly chooses the pencil control, permanently preventing DRUMS from opening in edit mode.
+- Audio pickers remember the last-used folder by default; Preferences can instead set a fixed starting audio folder.
+- Removed irrelevant Traktor-closing information from Mac Security setup and clarified that users must scroll to Security after macOS opens Privacy & Security.
+- The main window is explicitly reactivated after closing How to Use so the orange next action is immediately visible.
+
 # Version 0.6.0-beta.19
 
 - Replaced numbered workflow jumps with clear states: Add Audio, Prepare Master in Traktor, Review Assignments, and Ready to Create or Install.

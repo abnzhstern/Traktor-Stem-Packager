@@ -7,7 +7,6 @@ struct ContentView: View {
     @EnvironmentObject private var updateChecker: UpdateChecker
     @State private var showDetails = false
     @State private var showWorkflowGuide = false
-    @FocusState private var focusedStemRole: AudioRole?
     @AppStorage("hideWorkflowGuideOnLaunch") private var hideWorkflowGuideOnLaunch = false
 
     private let panel = Color(red: 0.105, green: 0.11, blue: 0.125)
@@ -40,12 +39,16 @@ struct ContentView: View {
         .background(background)
         .preferredColorScheme(.dark)
         .onAppear {
-            focusedStemRole = nil
             if !hideWorkflowGuideOnLaunch { showWorkflowGuide = true }
         }
         .onChange(of: model.resetGeneration) { _ in
-            focusedStemRole = nil
             showDetails = false
+        }
+        .onChange(of: showWorkflowGuide) { showing in
+            if !showing { reactivateMainWindow() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await model.auditTraktorState() }
         }
         .sheet(isPresented: $showWorkflowGuide) {
             workflowGuide
@@ -289,7 +292,7 @@ struct ContentView: View {
                             .fixedSize(horizontal: false, vertical: true)
                         securityStep(
                             "1",
-                            "If macOS blocks the first launch, open Privacy & Security, scroll to Security, choose Open Anyway, then confirm Open.",
+                            "If macOS blocks the first launch, open Privacy & Security. macOS opens the pane near the top, so scroll down to Security, choose Open Anyway, then confirm Open.",
                             buttonTitle: "OPEN PRIVACY & SECURITY",
                             action: model.openPrivacyAndSecurity
                         )
@@ -299,7 +302,6 @@ struct ContentView: View {
                             buttonTitle: "OPEN APP MANAGEMENT",
                             action: model.openAppManagementSettings
                         )
-                        securityStep("3", "Closing Traktor does not require Automation permission. The app first asks Traktor to quit normally. If Traktor stays open, press Command-Q in Traktor; this app detects the closure and continues.")
                     }
                     .padding(11)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -483,6 +485,25 @@ struct ContentView: View {
                 emptyText: "Choose Traktor’s configured Stems folder",
                 action: chooseStemsDirectory
             )
+            Divider().overlay(Color.white.opacity(0.08))
+            HStack(spacing: 9) {
+                Image(systemName: model.traktorAuditHasProblem
+                    ? "exclamationmark.triangle.fill"
+                    : (model.traktorSavedStateMayBeStale ? "clock.fill" : "checkmark.circle.fill"))
+                    .foregroundStyle(model.traktorAuditHasProblem
+                        ? Color.red
+                        : (model.traktorSavedStateMayBeStale ? Color.orange : Color.green))
+                Text(model.traktorAuditText ?? "Add a master to check its saved Traktor state.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Color.white.opacity(0.66))
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                Button("REFRESH TRAKTOR STATUS") {
+                    Task { await model.auditTraktorState(explainChange: true) }
+                }
+                .font(.system(size: 8.5, weight: .semibold))
+                .buttonStyle(.bordered)
+            }
         }
         .padding(14)
         .background(panel)
@@ -531,7 +552,7 @@ struct ContentView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("v0.6.0-beta.19")
+                Text("v0.6.0-beta.20")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.62))
                 Text("AAC + VERIFIED LOSSLESS")
@@ -686,8 +707,10 @@ struct ContentView: View {
                     isValidated: model.audioSetValidated,
                     isLocked: model.assignmentsLocked,
                     hasProblem: model.validationProblemRoles.contains(role),
-                    focusedRole: $focusedStemRole,
-                    select: { model.setFile($0, for: role) },
+                    select: {
+                        model.recordAudioSelection($0)
+                        model.setFile($0, for: role)
+                    },
                     clear: { model.clear(role) }
                 )
             }
@@ -798,24 +821,28 @@ struct ContentView: View {
 
     private func chooseAudioFolder() {
         let panel = NSOpenPanel()
+        panel.directoryURL = model.preferredAudioDirectoryURL
         panel.allowsMultipleSelection = false
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.canCreateDirectories = false
         panel.message = "Choose a folder containing one stereo master and four stems"
         if panel.runModal() == .OK, let directory = panel.url {
+            model.recordAudioSelection(directory)
             model.importFolder(directory)
         }
     }
 
     private func chooseMasterFile() {
         let panel = NSOpenPanel()
+        panel.directoryURL = model.preferredAudioDirectoryURL
         panel.allowedContentTypes = [.audio]
         panel.allowsMultipleSelection = false
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.message = "Choose the stereo master used for this package"
         if panel.runModal() == .OK, let file = panel.url {
+            model.recordAudioSelection(file)
             model.setFile(file, for: .master)
         }
     }
@@ -823,13 +850,22 @@ struct ContentView: View {
     private func chooseRemainingStemFiles() {
         let missingCount = AudioRole.allCases.filter { $0 != .master && model.files[$0] == nil }.count
         let panel = NSOpenPanel()
+        panel.directoryURL = model.preferredAudioDirectoryURL
         panel.allowedContentTypes = [.audio]
         panel.allowsMultipleSelection = true
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.message = "Choose up to \(missingCount) remaining stem file\(missingCount == 1 ? "" : "s")"
         if panel.runModal() == .OK {
+            if let first = panel.urls.first { model.recordAudioSelection(first) }
             model.addStemFiles(Array(panel.urls.prefix(missingCount)))
+        }
+    }
+
+    private func reactivateMainWindow() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            NSApplication.shared.activate(ignoringOtherApps: true)
+            NSApplication.shared.windows.first(where: { $0.isVisible && !$0.isSheet })?.makeKeyAndOrderFront(nil)
         }
     }
 

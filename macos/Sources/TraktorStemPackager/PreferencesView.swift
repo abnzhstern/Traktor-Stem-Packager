@@ -19,6 +19,25 @@ struct PreferencesView: View {
             Toggle("Open Traktor automatically after AAC export", isOn: $openTraktorAfterAAC)
             Toggle("Show Before You Begin at launch", isOn: showGuideBinding)
 
+            Section("Audio Files") {
+                Picker("Starting folder", selection: audioFolderBehaviorBinding) {
+                    ForEach(AudioFolderBehavior.allCases) { behavior in
+                        Text(behavior.title).tag(behavior)
+                    }
+                }
+                if model.audioFolderBehavior == .fixedFolder {
+                    locationRow("Audio folder", url: model.fixedAudioFolderURL, choose: chooseFixedAudioFolder)
+                } else {
+                    Text(model.lastAudioFolderURL.map {
+                        "Next picker: \($0.path(percentEncoded: false))"
+                    } ?? "The first picker uses macOS’s current location, then remembers your selection.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .truncationMode(.middle)
+                }
+            }
+
             Section("Traktor Locations") {
                 locationRow("Collection", url: model.collectionURL, choose: chooseCollection)
                 locationRow("Stems folder", url: model.stemsDirectoryURL, choose: chooseStemsDirectory)
@@ -27,11 +46,18 @@ struct PreferencesView: View {
         }
         .formStyle(.grouped)
         .padding(12)
-        .frame(width: 560, height: 330)
+        .frame(width: 560, height: 430)
     }
 
     private var showGuideBinding: Binding<Bool> {
         Binding(get: { !hideWorkflowGuideOnLaunch }, set: { hideWorkflowGuideOnLaunch = !$0 })
+    }
+
+    private var audioFolderBehaviorBinding: Binding<AudioFolderBehavior> {
+        Binding(
+            get: { model.audioFolderBehavior },
+            set: { model.setAudioFolderBehavior($0) }
+        )
     }
 
     private func locationRow(_ label: String, url: URL?, choose: @escaping () -> Void) -> some View {
@@ -61,6 +87,17 @@ struct PreferencesView: View {
         panel.canChooseDirectories = false
         panel.message = "Choose Traktor Pro 4 collection.nml"
         if panel.runModal() == .OK { model.setCollection(panel.url) }
+    }
+
+    private func chooseFixedAudioFolder() {
+        let panel = NSOpenPanel()
+        panel.directoryURL = model.fixedAudioFolderURL ?? model.lastAudioFolderURL
+        panel.allowsMultipleSelection = false
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.message = "Choose where audio file pickers should begin"
+        if panel.runModal() == .OK { model.setFixedAudioFolder(panel.url) }
     }
 
     private func chooseStemsDirectory() {

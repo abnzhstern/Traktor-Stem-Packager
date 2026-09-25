@@ -26,10 +26,12 @@ test('reports collection readiness without mutating the collection', () => {
   assert.equal(missingId.found, true);
   assert.equal(missingId.ready, false);
   assert.equal(missingId.hasAudioId, false);
+  assert.equal(missingId.collectionLinked, false);
 
   const absent = inspectCollectionEntry(unanalyzed, '/Users/andrew/Music/y.aif');
   assert.equal(absent.found, false);
   assert.equal(absent.ready, false);
+  assert.equal(absent.collectionLinked, false);
 });
 
 test('finds the exact master and sets linked-stem flag without disturbing other flags', () => {
@@ -40,8 +42,10 @@ test('finds the exact master and sets linked-stem flag without disturbing other 
 </ENTRY></COLLECTION></NML>`;
   const found = findCollectionEntry(collection, '/Users/andrew/Music/Take My Mind.aif');
   assert.equal(found.audioId, goodVibrationsAudioId);
+  assert.equal(inspectCollectionEntry(collection, '/Users/andrew/Music/Take My Mind.aif').collectionLinked, false);
   const updated = markEntryHasLinkedStems(collection, found);
   assert.match(updated, /<INFO FLAGS="76" GENRE="Pop"\/>/);
+  assert.equal(inspectCollectionEntry(updated, '/Users/andrew/Music/Take My Mind.aif').collectionLinked, true);
   assert.match(updated, /TITLE="Take My Mind"/);
 });
 

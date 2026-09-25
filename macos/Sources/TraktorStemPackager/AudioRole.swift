@@ -41,6 +41,19 @@ enum StartupWorkflow: String, CaseIterable, Identifiable {
     }
 }
 
+enum AudioFolderBehavior: String, CaseIterable, Identifiable {
+    case rememberLastUsed
+    case fixedFolder
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .rememberLastUsed: "Remember Last Used Folder"
+        case .fixedFolder: "Always Start In…"
+        }
+    }
+}
+
 enum AudioRole: String, CaseIterable, Identifiable, Hashable {
     case master = "Master"
     case drums = "Drums"
@@ -89,5 +102,6 @@ struct NativeReadiness: Decodable {
     let found: Bool
     let hasAudioId: Bool
     let linkedStemExists: Bool
+    let collectionLinked: Bool
     let message: String
 }

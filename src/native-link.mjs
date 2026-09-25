@@ -116,11 +116,14 @@ export function inspectCollectionEntry(collectionText, masterPath) {
     if (!location || !locationCandidates(location).includes(target)) continue;
     const entryTag = entryText.match(/^<ENTRY\b[^>]*>/)?.[0];
     const audioId = entryTag ? attributes(entryTag).AUDIO_ID : null;
+    const infoTag = entryText.match(/<INFO\b[^>]*\/?\s*>/)?.[0];
+    const flags = infoTag ? Number.parseInt(attributes(infoTag).FLAGS || '0', 10) : 0;
     const entry = { audioId, entryText, index: match.index };
     return {
       ready: Boolean(audioId),
       found: true,
       hasAudioId: Boolean(audioId),
+      collectionLinked: Number.isFinite(flags) && (flags & 64) === 64,
       message: audioId
         ? 'Master found and analyzed in the selected Traktor collection.'
         : 'Master found, but Traktor has not assigned an AUDIO_ID. Analyze it in Traktor first.',
@@ -131,6 +134,7 @@ export function inspectCollectionEntry(collectionText, masterPath) {
     ready: false,
     found: false,
     hasAudioId: false,
+    collectionLinked: false,
     message: 'This exact master is not in the selected Traktor collection. Import and analyze it in Traktor first.',
     entry: null,
   };

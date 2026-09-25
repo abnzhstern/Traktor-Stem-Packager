@@ -8,6 +8,9 @@ final class PackagerModel: ObservableObject {
     static let collectionPathKey = "traktorCollectionPath"
     static let stemsDirectoryPathKey = "traktorStemsDirectoryPath"
     static let openTraktorAfterAACKey = "openTraktorAfterAACExport"
+    static let audioFolderBehaviorKey = "audioFolderBehavior"
+    static let lastAudioFolderPathKey = "lastAudioFolderPath"
+    static let fixedAudioFolderPathKey = "fixedAudioFolderPath"
 
     enum State: Equatable {
         case waiting
@@ -44,17 +47,34 @@ final class PackagerModel: ObservableObject {
     @Published private(set) var validationAccepted = false
     @Published var waitingForManualTraktorQuit = false
     @Published private(set) var resetGeneration = 0
+    @Published var audioFolderBehavior: AudioFolderBehavior = .rememberLastUsed
+    @Published var lastAudioFolderURL: URL?
+    @Published var fixedAudioFolderURL: URL?
+    @Published private(set) var traktorAuditText: String?
+    @Published private(set) var traktorSavedStateMayBeStale = false
+    @Published private(set) var traktorAuditHasProblem = false
     private var extractedArtworkURL: URL?
     private var readinessTask: Task<Void, Never>?
     private var validationTask: Task<Void, Never>?
     private var metadataTask: Task<Void, Never>?
     private var workflowGeneration = 0
     private var metadataGeneration = 0
+    private var observedCollectionModificationDate: Date?
+    private var observedStemsModificationDate: Date?
 
     init() {
         let manager = FileManager.default
         let defaults = UserDefaults.standard
         let home = manager.homeDirectoryForCurrentUser
+        audioFolderBehavior = AudioFolderBehavior(
+            rawValue: defaults.string(forKey: Self.audioFolderBehaviorKey) ?? ""
+        ) ?? .rememberLastUsed
+        if let path = defaults.string(forKey: Self.lastAudioFolderPathKey), !path.isEmpty {
+            lastAudioFolderURL = URL(fileURLWithPath: path, isDirectory: true)
+        }
+        if let path = defaults.string(forKey: Self.fixedAudioFolderPathKey), !path.isEmpty {
+            fixedAudioFolderURL = URL(fileURLWithPath: path, isDirectory: true)
+        }
         let startup = StartupWorkflow(rawValue: defaults.string(forKey: Self.startupWorkflowKey) ?? "") ?? .rememberLastUsed
         switch startup {
         case .rememberLastUsed:
@@ -76,6 +96,7 @@ final class PackagerModel: ObservableObject {
             stemsDirectoryURL = Self.detectStemsDirectory(home: home, manager: manager)
         }
         refreshTraktorStatus()
+        primeObservedTraktorFiles()
     }
 
     private static func detectCollection(home: URL, manager: FileManager) -> URL? {
@@ -102,6 +123,11 @@ final class PackagerModel: ObservableObject {
     var audioSetValidated: Bool { hasAllFiles && validationAccepted && report != nil }
     var assignmentsLocked: Bool { audioSetValidated && !assignmentsNeedReview }
     var canStartNewPackage: Bool { state != .packaging && !waitingForManualTraktorQuit }
+    var preferredAudioDirectoryURL: URL? {
+        let candidate = audioFolderBehavior == .fixedFolder ? fixedAudioFolderURL : lastAudioFolderURL
+        guard let candidate, locationExists(candidate) else { return nil }
+        return candidate
+    }
     var canCreate: Bool {
         state == .ready && audioSetValidated &&
             (mode == .portableAAC || (collectionURL != nil && stemsDirectoryURL != nil && nativeReadiness?.ready == true))
@@ -297,6 +323,8 @@ final class PackagerModel: ObservableObject {
             discardExtractedArtwork()
             artworkURL = nil
             nativeReadiness = nil
+            traktorAuditText = mode == .nativeLossless ? "Add a master to check its saved Traktor state." : nil
+            traktorAuditHasProblem = false
         } else {
             refreshNativeReadiness()
         }
@@ -310,6 +338,8 @@ final class PackagerModel: ObservableObject {
         report = nil
         validationAccepted = false
         nativeReadiness = nil
+        traktorAuditText = mode == .nativeLossless ? "Add a master to check its saved Traktor state." : nil
+        traktorAuditHasProblem = false
         validationProblemRoles = []
         assignmentsNeedReview = false
         waitingForManualTraktorQuit = false
@@ -351,6 +381,7 @@ final class PackagerModel: ObservableObject {
         } else {
             UserDefaults.standard.removeObject(forKey: Self.collectionPathKey)
         }
+        observedCollectionModificationDate = modificationDate(for: url)
         refreshNativeReadiness()
     }
 
@@ -361,7 +392,29 @@ final class PackagerModel: ObservableObject {
         } else {
             UserDefaults.standard.removeObject(forKey: Self.stemsDirectoryPathKey)
         }
+        observedStemsModificationDate = modificationDate(for: url)
         refreshNativeReadiness()
+    }
+
+    func setAudioFolderBehavior(_ behavior: AudioFolderBehavior) {
+        audioFolderBehavior = behavior
+        UserDefaults.standard.set(behavior.rawValue, forKey: Self.audioFolderBehaviorKey)
+    }
+
+    func setFixedAudioFolder(_ url: URL?) {
+        fixedAudioFolderURL = url
+        if let url {
+            UserDefaults.standard.set(url.path, forKey: Self.fixedAudioFolderPathKey)
+            setAudioFolderBehavior(.fixedFolder)
+        } else {
+            UserDefaults.standard.removeObject(forKey: Self.fixedAudioFolderPathKey)
+        }
+    }
+
+    func recordAudioSelection(_ url: URL) {
+        let directory = url.hasDirectoryPath ? url : url.deletingLastPathComponent()
+        lastAudioFolderURL = directory
+        UserDefaults.standard.set(directory.path, forKey: Self.lastAudioFolderPathKey)
     }
 
     func resetDetectedLocations() {
@@ -372,6 +425,7 @@ final class PackagerModel: ObservableObject {
         let home = manager.homeDirectoryForCurrentUser
         collectionURL = Self.detectCollection(home: home, manager: manager)
         stemsDirectoryURL = Self.detectStemsDirectory(home: home, manager: manager)
+        primeObservedTraktorFiles()
         refreshNativeReadiness()
     }
 
@@ -382,27 +436,129 @@ final class PackagerModel: ObservableObject {
 
     func refreshTraktorStatus() {
         traktorRunning = runningTraktorApplication() != nil
+        traktorSavedStateMayBeStale = traktorRunning && mode == .nativeLossless && files[.master] != nil
     }
 
     func pollTraktorStatus() async {
         let wasRunning = traktorRunning
         refreshTraktorStatus()
-        if wasRunning,
-           !traktorRunning,
-           mode == .nativeLossless,
-           files[.master] != nil,
-           collectionURL != nil,
-           state != .packaging {
-            await checkTraktorForMaster()
+        let collectionDate = modificationDate(for: collectionURL)
+        let stemsDate = modificationDate(for: stemsDirectoryURL)
+        let collectionChanged = observedCollectionModificationDate != nil &&
+            collectionDate != observedCollectionModificationDate
+        let stemsChanged = observedStemsModificationDate != nil &&
+            stemsDate != observedStemsModificationDate
+        observedCollectionModificationDate = collectionDate
+        observedStemsModificationDate = stemsDate
+
+        guard mode == .nativeLossless,
+              files[.master] != nil,
+              collectionURL != nil,
+              state != .packaging else { return }
+
+        if (wasRunning && !traktorRunning) || collectionChanged || stemsChanged {
+            await auditTraktorState(explainChange: true)
         }
+    }
+
+    func auditTraktorState(explainChange: Bool = false) async {
+        refreshTraktorStatus()
+        guard mode == .nativeLossless else {
+            traktorAuditText = nil
+            traktorAuditHasProblem = false
+            return
+        }
+        guard let master = files[.master], let collectionURL else {
+            traktorAuditText = files[.master] == nil
+                ? "Add a master to check its saved Traktor state."
+                : "Choose Traktor’s collection.nml to check the master."
+            traktorAuditHasProblem = false
+            return
+        }
+
+        let previous = nativeReadiness
+        do {
+            let result = try await EngineBridge().checkNativeReadiness(
+                master: master, collection: collectionURL, stemsDirectory: stemsDirectoryURL
+            )
+            guard files[.master] == master, self.collectionURL == collectionURL else { return }
+            nativeReadiness = result
+            updateTraktorAuditSummary(result)
+
+            guard explainChange, !assignmentsNeedReview, state != .validating else { return }
+            if previous?.collectionLinked == true && !result.collectionLinked {
+                state = audioSetValidated ? .ready : .waiting
+                statusText = "Traktor’s saved collection no longer links this master to its Stem file."
+                recoveryText = audioSetValidated
+                    ? "The current package is ready to install again. Follow the orange install action."
+                    : "Add or confirm the updated stems, then follow the orange install action."
+            } else if previous?.ready == true && !result.ready {
+                state = audioSetValidated ? .ready : .waiting
+                statusText = "The selected master is no longer analyzed in Traktor’s saved collection."
+                recoveryText = "Import and analyze this exact master in Traktor, then save or close Traktor so the app can verify it."
+            } else if !traktorRunning && result.ready && audioSetValidated {
+                state = .ready
+                statusText = result.collectionLinked
+                    ? "Saved Traktor state verified. This master is analyzed and linked to a Stem file."
+                    : "Saved Traktor state verified. This master is analyzed and ready for Stem installation."
+            }
+        } catch {
+            traktorAuditText = "Traktor’s saved collection could not be checked: \(error.localizedDescription)"
+            traktorAuditHasProblem = true
+        }
+    }
+
+    private func updateTraktorAuditSummary(_ result: NativeReadiness) {
+        let prefix = traktorRunning ? "SAVED STATE" : "VERIFIED"
+        let suffix = traktorRunning ? " Recent changes in open Traktor may not be saved yet." : ""
+        if !result.found {
+            traktorAuditText = "\(prefix): This exact master is not in Traktor’s saved collection.\(suffix)"
+            traktorAuditHasProblem = true
+        } else if !result.hasAudioId {
+            traktorAuditText = "\(prefix): The master is present but has not been analyzed.\(suffix)"
+            traktorAuditHasProblem = true
+        } else if result.collectionLinked && result.linkedStemExists {
+            traktorAuditText = "\(prefix): The master is analyzed and its linked Stem file is present.\(suffix)"
+            traktorAuditHasProblem = false
+        } else if result.collectionLinked {
+            traktorAuditText = "\(prefix): The master is linked, but its Stem file is missing.\(suffix)"
+            traktorAuditHasProblem = true
+        } else if result.linkedStemExists {
+            traktorAuditText = "\(prefix): The master is analyzed. A Stem file exists but is not linked in Traktor.\(suffix)"
+            traktorAuditHasProblem = false
+        } else {
+            traktorAuditText = "\(prefix): The master is analyzed and has no linked stems.\(suffix)"
+            traktorAuditHasProblem = false
+        }
+    }
+
+    private func modificationDate(for url: URL?) -> Date? {
+        guard let url else { return nil }
+        return try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+    }
+
+    private func primeObservedTraktorFiles() {
+        observedCollectionModificationDate = modificationDate(for: collectionURL)
+        observedStemsModificationDate = modificationDate(for: stemsDirectoryURL)
     }
 
     func refreshNativeReadiness() {
         readinessTask?.cancel()
         nativeReadiness = nil
-        guard mode == .nativeLossless,
+        guard mode == .nativeLossless else {
+            traktorAuditText = nil
+            traktorAuditHasProblem = false
+            return
+        }
+        guard
               let master = files[.master],
-              let collection = collectionURL else { return }
+              let collection = collectionURL else {
+            traktorAuditText = files[.master] == nil
+                ? "Add a master to check its saved Traktor state."
+                : "Choose Traktor’s collection.nml to check the master."
+            traktorAuditHasProblem = false
+            return
+        }
         readinessTask = Task { [weak self] in
             do {
                 let result = try await EngineBridge().checkNativeReadiness(
@@ -412,10 +568,12 @@ final class PackagerModel: ObservableObject {
                       self?.files[.master] == master,
                       self?.collectionURL == collection else { return }
                 self?.nativeReadiness = result
+                self?.updateTraktorAuditSummary(result)
             } catch {
                 guard !Task.isCancelled else { return }
                 self?.nativeReadiness = NativeReadiness(
                     ready: false, found: false, hasAudioId: false, linkedStemExists: false,
+                    collectionLinked: false,
                     message: error.localizedDescription
                 )
             }
@@ -442,6 +600,7 @@ final class PackagerModel: ObservableObject {
             )
             nativeReadiness = result
             refreshTraktorStatus()
+            updateTraktorAuditSummary(result)
             if result.ready {
                 statusText = traktorRunning
                     ? "The saved collection contains this master. Because Traktor is open, the app will close it and verify the current saved state before installation."
@@ -454,7 +613,12 @@ final class PackagerModel: ObservableObject {
                 recoveryText = "Choose Drag Stereo Master into Traktor below. Drop that exact file into Traktor’s Track Collection—not onto a deck—and let analysis finish."
             }
         } catch {
-            nativeReadiness = NativeReadiness(ready: false, found: false, hasAudioId: false, linkedStemExists: false, message: error.localizedDescription)
+            nativeReadiness = NativeReadiness(
+                ready: false, found: false, hasAudioId: false, linkedStemExists: false,
+                collectionLinked: false, message: error.localizedDescription
+            )
+            traktorAuditText = "Traktor’s saved collection could not be checked: \(error.localizedDescription)"
+            traktorAuditHasProblem = true
             statusText = "Traktor’s collection could not be checked."
             recoveryText = "Confirm the Collection path points to collection.nml. The app will check again automatically."
         }
@@ -814,11 +978,13 @@ final class PackagerModel: ObservableObject {
                     master: master, collection: collection, stemsDirectory: stemsDirectoryURL
                 )
                 nativeReadiness = result
+                updateTraktorAuditSummary(result)
                 if result.ready { return result }
                 if attempt < 7 { try await Task.sleep(nanoseconds: 250_000_000) }
             } catch {
                 nativeReadiness = NativeReadiness(
                     ready: false, found: false, hasAudioId: false, linkedStemExists: false,
+                    collectionLinked: false,
                     message: error.localizedDescription
                 )
                 if attempt < 7 { try? await Task.sleep(nanoseconds: 250_000_000) }
