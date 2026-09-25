@@ -1,4 +1,5 @@
 import AppKit
+import CryptoKit
 import Foundation
 
 @MainActor
@@ -11,6 +12,8 @@ final class PackagerModel: ObservableObject {
     static let audioFolderBehaviorKey = "audioFolderBehavior"
     static let lastAudioFolderPathKey = "lastAudioFolderPath"
     static let fixedAudioFolderPathKey = "fixedAudioFolderPath"
+    static let lastInstalledFingerprintKey = "lastInstalledPackageFingerprint"
+    static let lastInstalledDestinationKey = "lastInstalledDestinationPath"
 
     enum State: Equatable {
         case waiting
@@ -19,6 +22,22 @@ final class PackagerModel: ObservableObject {
         case packaging
         case complete(URL)
         case failed(String)
+    }
+
+    enum WorkflowPhase: Equatable {
+        case addMaster
+        case chooseTraktorLocations
+        case checkingTraktor
+        case prepareMasterInTraktor
+        case saveTraktorAndRefresh
+        case addStems
+        case reviewAssignments
+        case validating
+        case readyToCreateAAC
+        case readyToInstallLossless
+        case working
+        case installed
+        case actionNeeded
     }
 
     @Published var files: [AudioRole: URL] = [:]
@@ -53,6 +72,7 @@ final class PackagerModel: ObservableObject {
     @Published private(set) var traktorAuditText: String?
     @Published private(set) var traktorSavedStateMayBeStale = false
     @Published private(set) var traktorAuditHasProblem = false
+    @Published private(set) var traktorRefreshRequiresSave = false
     private var extractedArtworkURL: URL?
     private var readinessTask: Task<Void, Never>?
     private var validationTask: Task<Void, Never>?
@@ -133,6 +153,42 @@ final class PackagerModel: ObservableObject {
             (mode == .portableAAC || (collectionURL != nil && stemsDirectoryURL != nil && nativeReadiness?.ready == true))
     }
 
+    var canAddRemainingStems: Bool {
+        guard files[.master] != nil,
+              !hasAllFiles,
+              !assignmentsNeedReview,
+              state != .validating,
+              state != .packaging else { return false }
+        return mode == .portableAAC || nativeReadiness?.ready == true
+    }
+
+    var workflowPhase: WorkflowPhase {
+        if state == .validating { return .validating }
+        if state == .packaging { return .working }
+        if case .failed = state { return .actionNeeded }
+        if assignmentsNeedReview { return .reviewAssignments }
+        if files[.master] == nil { return .addMaster }
+
+        if mode == .portableAAC {
+            if !hasAllFiles { return .addStems }
+            if case .complete = state { return .installed }
+            return .readyToCreateAAC
+        }
+
+        if collectionURL == nil || stemsDirectoryURL == nil { return .chooseTraktorLocations }
+        if nativeReadiness == nil { return .checkingTraktor }
+        if traktorRefreshRequiresSave && traktorRunning { return .saveTraktorAndRefresh }
+        if case .complete = state,
+           nativeReadiness?.collectionLinked == true,
+           nativeReadiness?.linkedStemExists == true { return .installed }
+        if nativeReadiness?.ready == false {
+            return traktorRunning ? .saveTraktorAndRefresh : .prepareMasterInTraktor
+        }
+        if !hasAllFiles { return .addStems }
+        if traktorRunning { return .saveTraktorAndRefresh }
+        return .readyToInstallLossless
+    }
+
     var canResolveUnsavedAnalysis: Bool {
         state == .ready && mode == .nativeLossless && hasAllFiles &&
             collectionURL != nil && stemsDirectoryURL != nil &&
@@ -154,6 +210,7 @@ final class PackagerModel: ObservableObject {
         validationAccepted = false
         validationProblemRoles = []
         recoveryText = nil
+        traktorRefreshRequiresSave = false
         state = .waiting
         assignmentsNeedReview = hasAllFiles
         statusText = hasAllFiles
@@ -178,6 +235,7 @@ final class PackagerModel: ObservableObject {
         validationAccepted = false
         validationProblemRoles = []
         recoveryText = nil
+        traktorRefreshRequiresSave = false
         state = .waiting
         assignmentsNeedReview = hasAllFiles
         statusText = hasAllFiles
@@ -308,6 +366,7 @@ final class PackagerModel: ObservableObject {
         validationAccepted = false
         validationProblemRoles = []
         recoveryText = nil
+        traktorRefreshRequiresSave = false
         assignmentsNeedReview = false
         state = .waiting
         statusText = "Add your master and four stem files, or import a five-file folder."
@@ -340,6 +399,7 @@ final class PackagerModel: ObservableObject {
         nativeReadiness = nil
         traktorAuditText = mode == .nativeLossless ? "Add a master to check its saved Traktor state." : nil
         traktorAuditHasProblem = false
+        traktorRefreshRequiresSave = false
         validationProblemRoles = []
         assignmentsNeedReview = false
         waitingForManualTraktorQuit = false
@@ -437,6 +497,7 @@ final class PackagerModel: ObservableObject {
     func refreshTraktorStatus() {
         traktorRunning = runningTraktorApplication() != nil
         traktorSavedStateMayBeStale = traktorRunning && mode == .nativeLossless && files[.master] != nil
+        if !traktorRunning { traktorRefreshRequiresSave = false }
     }
 
     func pollTraktorStatus() async {
@@ -484,9 +545,25 @@ final class PackagerModel: ObservableObject {
             guard files[.master] == master, self.collectionURL == collectionURL else { return }
             nativeReadiness = result
             updateTraktorAuditSummary(result)
+            let installedStateIsStillValid = isVerifiedInstalledState(result)
+
+            if traktorRunning && result.collectionLinked && !result.linkedStemExists {
+                traktorRefreshRequiresSave = true
+                traktorAuditText = "SAVED STATE: Traktor’s saved collection still links this master, but the Stem file is missing. If you changed or removed the track in open Traktor, save and close Traktor so the app can read the current state."
+            }
 
             guard explainChange, !assignmentsNeedReview, state != .validating else { return }
-            if previous?.collectionLinked == true && !result.collectionLinked {
+            if installedStateIsStillValid {
+                return
+            } else if case .complete = state {
+                state = audioSetValidated ? .ready : .waiting
+                statusText = result.found
+                    ? "The previously installed Stem link is no longer complete in Traktor’s saved state."
+                    : "The selected master is no longer present in Traktor’s saved collection."
+                recoveryText = result.found
+                    ? "Review the saved-state message and follow the orange next action to repair or replace the link."
+                    : "Import and analyze this exact master in Traktor, then save and close Traktor so the app can verify it."
+            } else if previous?.collectionLinked == true && !result.collectionLinked {
                 state = audioSetValidated ? .ready : .waiting
                 statusText = "Traktor’s saved collection no longer links this master to its Stem file."
                 recoveryText = audioSetValidated
@@ -496,7 +573,8 @@ final class PackagerModel: ObservableObject {
                 state = audioSetValidated ? .ready : .waiting
                 statusText = "The selected master is no longer analyzed in Traktor’s saved collection."
                 recoveryText = "Import and analyze this exact master in Traktor, then save or close Traktor so the app can verify it."
-            } else if !traktorRunning && result.ready && audioSetValidated {
+            } else if !traktorRunning && result.ready && audioSetValidated,
+                      !isVerifiedInstalledState(result) {
                 state = .ready
                 statusText = result.collectionLinked
                     ? "Saved Traktor state verified. This master is analyzed and linked to a Stem file."
@@ -537,6 +615,46 @@ final class PackagerModel: ObservableObject {
         return try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
     }
 
+    private func packageFingerprint() -> String? {
+        guard hasAllFiles else { return nil }
+        var components: [String] = []
+        for role in AudioRole.allCases {
+            guard let url = files[role] else { return nil }
+            let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+            components.append([
+                role.rawValue,
+                url.standardizedFileURL.path,
+                String(values?.fileSize ?? -1),
+                String(values?.contentModificationDate?.timeIntervalSince1970 ?? -1)
+            ].joined(separator: "|"))
+        }
+        for role in [AudioRole.drums, .bass, .other, .vocals] {
+            components.append("\(role.rawValue)|\(stemNames[role] ?? role.rawValue)")
+        }
+        let digest = SHA256.hash(data: Data(components.joined(separator: "\n").utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
+    private func rememberInstalledPackage(destination: URL) {
+        guard let fingerprint = packageFingerprint() else { return }
+        let defaults = UserDefaults.standard
+        defaults.set(fingerprint, forKey: Self.lastInstalledFingerprintKey)
+        defaults.set(destination.path, forKey: Self.lastInstalledDestinationKey)
+    }
+
+    private func isVerifiedInstalledState(_ readiness: NativeReadiness) -> Bool {
+        guard readiness.collectionLinked, readiness.linkedStemExists else { return false }
+        if case .complete = state { return true }
+        guard let current = packageFingerprint(),
+              current == UserDefaults.standard.string(forKey: Self.lastInstalledFingerprintKey),
+              let path = UserDefaults.standard.string(forKey: Self.lastInstalledDestinationKey),
+              FileManager.default.fileExists(atPath: path) else { return false }
+        state = .complete(URL(fileURLWithPath: path))
+        statusText = "Installed and verified. This exact package is already linked to the selected Traktor master."
+        recoveryText = "Load the original master in Traktor; it should open as a Stem Deck. Choose Edit Assignments or Start New Package before installing a different set."
+        return true
+    }
+
     private func primeObservedTraktorFiles() {
         observedCollectionModificationDate = modificationDate(for: collectionURL)
         observedStemsModificationDate = modificationDate(for: stemsDirectoryURL)
@@ -567,8 +685,10 @@ final class PackagerModel: ObservableObject {
                 guard !Task.isCancelled,
                       self?.files[.master] == master,
                       self?.collectionURL == collection else { return }
-                self?.nativeReadiness = result
-                self?.updateTraktorAuditSummary(result)
+                guard let self else { return }
+                self.nativeReadiness = result
+                self.updateTraktorAuditSummary(result)
+                _ = self.isVerifiedInstalledState(result)
             } catch {
                 guard !Task.isCancelled else { return }
                 self?.nativeReadiness = NativeReadiness(
@@ -624,33 +744,79 @@ final class PackagerModel: ObservableObject {
         }
     }
 
-    func saveAndQuitAfterAnalysis() async {
+    func refreshTraktorStateFromUser() async {
+        await auditTraktorState(explainChange: true)
+        guard mode == .nativeLossless, files[.master] != nil else { return }
+        if traktorRunning {
+            traktorRefreshRequiresSave = true
+            let savedSummary = traktorAuditText ?? "Traktor’s saved collection was checked."
+            traktorAuditText = "\(savedSummary) Traktor is still open, so unsaved changes cannot be read yet."
+            statusText = "The saved Traktor collection was refreshed. Open Traktor may still contain unsaved changes."
+            recoveryText = "Choose Save & Quit Traktor, Then Refresh to save the current Traktor state and update this app automatically."
+        } else {
+            traktorRefreshRequiresSave = false
+            statusText = "Traktor’s saved collection and Stem folder were refreshed."
+            recoveryText = nil
+        }
+    }
+
+    func saveQuitTraktorAndRefresh() async {
         refreshTraktorStatus()
         guard let traktor = runningTraktorApplication(), let collectionURL else {
-            await checkTraktorForMaster()
+            traktorRefreshRequiresSave = false
+            await auditTraktorState(explainChange: true)
             return
         }
 
         let traktorURL = traktor.bundleURL
-
         state = .packaging
+        recoveryText = nil
         guard await closeTraktorAndWait(traktor) else { return }
-        statusText = "Checking Traktor’s saved track ID…"
-        let readiness = await recheckNativeReadinessAfterTraktorQuit(master: files[.master], collection: collectionURL)
-        state = report != nil && hasAllFiles ? .ready : .waiting
-        if readiness?.ready == true {
-            statusText = hasAllFiles
-                ? "Analyzed master found. All five files are ready for installation."
-                : "Analyzed master found. Add the remaining stems to continue."
-            recoveryText = hasAllFiles
-                ? "Choose Verify & Install Lossless Stems below."
-                : "Add the remaining four stem files individually or use Import Folder."
-        } else {
-            statusText = readiness?.message ?? "The saved Traktor track ID was not found."
-            recoveryText = "Confirm the exact master appears in Traktor’s Track Collection and has finished analysis, then follow the orange next-action button."
+
+        statusText = "Traktor closed. Reading its newly saved collection…"
+        let readiness = await recheckNativeReadinessAfterTraktorQuit(
+            master: files[.master], collection: collectionURL
+        )
+        traktorRefreshRequiresSave = false
+
+        guard let readiness else {
+            state = audioSetValidated ? .ready : .waiting
+            statusText = "Traktor closed, but its saved collection could not be read."
+            recoveryText = "Confirm the Collection path below, then choose Refresh Traktor Status."
+            return
         }
-        if let traktorURL { _ = NSWorkspace.shared.open(traktorURL) }
-        refreshTraktorStatus()
+
+        if readiness.ready {
+            if isVerifiedInstalledState(readiness) {
+                statusText = "Saved Traktor state refreshed. This exact package remains installed and linked."
+                recoveryText = "Load the original master in Traktor; it should open as a Stem Deck."
+            } else {
+                state = audioSetValidated ? .ready : .waiting
+                statusText = audioSetValidated
+                    ? "Saved Traktor state refreshed. The analyzed master is ready for lossless Stem installation."
+                    : "Saved Traktor state refreshed. The analyzed master was found. Add the remaining stems."
+                recoveryText = audioSetValidated
+                    ? "Choose Verify & Install Lossless Stems."
+                    : "Add the remaining four stem files individually or use Import Folder."
+            }
+            return
+        }
+
+        state = audioSetValidated ? .ready : .waiting
+        statusText = readiness.found
+            ? "The master is saved in Traktor but has not finished analysis."
+            : "The exact stereo master is missing from Traktor’s newly saved collection."
+        recoveryText = "Traktor will reopen and Finder will highlight the exact master. Drag it into Traktor’s Track Collection—not onto a deck—and let analysis finish."
+        if let traktorURL {
+            _ = NSWorkspace.shared.open(traktorURL)
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            refreshTraktorStatus()
+            revealMasterInFinder()
+        }
+    }
+
+    func saveAndQuitAfterAnalysis() async {
+        await saveQuitTraktorAndRefresh()
     }
 
     func openTraktorAndRevealMaster() {
@@ -781,6 +947,9 @@ final class PackagerModel: ObservableObject {
             statusText = result.limiterEnabled
                 ? String(format: "Accepted. All five files match. Peak protection is enabled at a −0.3 dBFS ceiling because the combined peak is %.1f dBFS.", result.stemSumTruePeakDbfs)
                 : String(format: "Accepted. All five files match. Peak protection is not needed; the combined peak is %.1f dBFS.", result.stemSumTruePeakDbfs)
+            if mode == .nativeLossless, let readiness = nativeReadiness {
+                _ = isVerifiedInstalledState(readiness)
+            }
         } catch {
             guard !Task.isCancelled,
                   workflowGeneration == generation,
@@ -950,6 +1119,7 @@ final class PackagerModel: ObservableObject {
                 }
             }
             let destination = URL(fileURLWithPath: result.destination)
+            rememberInstalledPackage(destination: destination)
             state = .complete(destination)
             statusText = "Installed and verified: all five decoded PCM streams match their sources exactly."
             recoveryText = result.stemBackup == nil

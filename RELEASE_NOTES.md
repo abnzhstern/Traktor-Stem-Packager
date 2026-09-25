@@ -1,3 +1,13 @@
+# Version 0.6.0-beta.21
+
+- Rebuilt the visible workflow around one authoritative phase at a time, so the interface cannot simultaneously guide conflicting actions.
+- A successful lossless install now remains Complete; automatic Traktor audits no longer reactivate the install button and invite a duplicate installation.
+- The app remembers a verified package fingerprint and recognizes the same already-installed source set after reopening.
+- Refresh Traktor Status now reports that an open Traktor session may contain unsaved changes and exposes one orange Save & Quit Traktor, Then Refresh action.
+- After Traktor closes, the app waits for the saved collection, rereads the master/link/Stem state, and updates automatically. It reopens Traktor only when the master must be imported or analyzed again.
+- Add Remaining Stems is driven by missing files rather than the previous fragile waiting-state check, so it appears consistently when it is the next action.
+- Main-window file pickers are attached sheets instead of hidden blocking dialogs, eliminating the unexplained macOS beep when another window covered a picker.
+
 # Version 0.6.0-beta.20
 
 - Added continuous monitoring of the saved Traktor collection and Stems folder while the app is open, plus a manual Refresh Traktor Status control.

@@ -95,8 +95,9 @@ struct ContentView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
-            if model.state == .waiting && !model.assignmentsNeedReview {
-                if model.files[.master] == nil {
+            VStack(alignment: .trailing, spacing: 6) {
+                switch model.workflowPhase {
+                case .addMaster:
                     VStack(alignment: .trailing, spacing: 6) {
                         Button("ADD MASTER") { chooseMasterFile() }
                             .font(.system(size: 9, weight: .semibold))
@@ -106,41 +107,33 @@ struct ContentView: View {
                             .font(.system(size: 9, weight: .semibold))
                             .buttonStyle(.bordered)
                     }
-                } else if !model.hasAllFiles &&
-                            (model.mode == .portableAAC || model.nativeReadiness?.ready == true) {
+                case .addStems:
                     Button("ADD REMAINING STEMS") { chooseRemainingStemFiles() }
                         .font(.system(size: 9, weight: .semibold))
                         .buttonStyle(.borderedProminent)
                         .tint(.orange)
-                }
-            }
-            if model.mode == .nativeLossless,
-               model.files[.master] != nil,
-               !model.assignmentsNeedReview,
-               model.state != .packaging {
-                VStack(alignment: .trailing, spacing: 6) {
-                    if model.nativeReadiness?.ready == false {
-                        if model.traktorRunning {
-                            Button(model.canResolveUnsavedAnalysis ? "CLOSE TRAKTOR & INSTALL" : "CLOSE TRAKTOR & CHECK MASTER") {
-                                if model.canResolveUnsavedAnalysis {
-                                    Task { await model.create() }
-                                } else {
-                                    Task { await model.saveAndQuitAfterAnalysis() }
-                                }
-                            }
-                            .font(.system(size: 9, weight: .semibold))
-                            .buttonStyle(.borderedProminent)
-                            .tint(.orange)
-                        } else {
-                            Button("OPEN TRAKTOR & SHOW MASTER") { model.openTraktorAndRevealMaster() }
-                                .font(.system(size: 9, weight: .semibold))
-                                .buttonStyle(.borderedProminent)
-                                .tint(.orange)
-                        }
+                case .saveTraktorAndRefresh:
+                    Button("SAVE & QUIT TRAKTOR, THEN REFRESH") {
+                        Task { await model.saveQuitTraktorAndRefresh() }
                     }
-                    Button("SHOW MASTER IN FINDER") { model.revealMasterInFinder() }
                     .font(.system(size: 9, weight: .semibold))
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.borderedProminent)
+                    .tint(.orange)
+                case .prepareMasterInTraktor:
+                    Button("OPEN TRAKTOR & SHOW MASTER") { model.openTraktorAndRevealMaster() }
+                        .font(.system(size: 9, weight: .semibold))
+                        .buttonStyle(.borderedProminent)
+                        .tint(.orange)
+                default:
+                    EmptyView()
+                }
+
+                if model.mode == .nativeLossless,
+                   model.files[.master] != nil,
+                   model.workflowPhase != .working {
+                    Button("SHOW MASTER IN FINDER") { model.revealMasterInFinder() }
+                        .font(.system(size: 9, weight: .semibold))
+                        .buttonStyle(.bordered)
                 }
             }
         }
@@ -150,57 +143,40 @@ struct ContentView: View {
     }
 
     private var currentWorkflowStep: (label: String, message: String, icon: String, color: Color) {
-        switch model.state {
+        switch model.workflowPhase {
         case .validating:
             return ("CHECKING FILES", "Verifying format, duration, synchronization and peak level…", "waveform", .blue)
-        case .packaging:
+        case .working:
             return ("WORKING", model.statusText, "gearshape.2.fill", .blue)
-        case .complete:
+        case .installed:
             return ("COMPLETE", model.statusText, "checkmark.circle.fill", .green)
-        case .failed:
+        case .actionNeeded:
             return ("ACTION NEEDED", model.statusText, "exclamationmark.triangle.fill", .red)
-        default:
-            break
-        }
-
-        if model.assignmentsNeedReview {
+        case .reviewAssignments:
             return ("REVIEW ASSIGNMENTS", "Check all five slots. Drag any file onto another slot to reassign it, then choose Accept Assignments.", "hand.draw.fill", .blue)
-        }
-
-        if model.mode == .portableAAC {
-            if model.files[.master] == nil {
-                return ("ADD AUDIO", "Add the stereo master first, or import a folder containing the master and four stems.", "waveform.badge.plus", .blue)
-            }
-            if !model.hasAllFiles {
-                return ("ADD AUDIO", "Add the remaining stem files. You can choose several at once or place them in the slots below.", "waveform.badge.plus", .blue)
-            }
-            return ("READY TO CREATE", "Review the metadata, then create the AAC Stem file. Drag the finished .stem.mp4 directly into Traktor; all four stems will be present.", "checkmark.circle.fill", .green)
-        }
-
-        if model.files[.master] == nil {
-            return ("ADD AUDIO", "Add the exact stereo master used in Traktor first, or import a folder containing the master and four stems.", "waveform.badge.plus", .blue)
-        }
-        if model.collectionURL == nil || model.stemsDirectoryURL == nil {
+        case .addMaster:
+            let message = model.mode == .portableAAC
+                ? "Add the stereo master first, or import a folder containing the master and four stems."
+                : "Add the exact stereo master used in Traktor first, or import a folder containing the master and four stems."
+            return ("ADD AUDIO", message, "waveform.badge.plus", .blue)
+        case .chooseTraktorLocations:
             return ("CHOOSE TRAKTOR LOCATIONS", "Confirm the Traktor Collection and Stems folder locations below.", "folder.badge.gearshape", .blue)
-        }
-        if model.nativeReadiness == nil {
+        case .checkingTraktor:
             return ("CHECKING TRAKTOR", "Checking the master against Traktor’s saved collection…", "magnifyingglass.circle.fill", .blue)
-        }
-        if model.nativeReadiness?.ready == false {
-            if model.traktorRunning {
-                return ("NEXT ACTION", model.canResolveUnsavedAnalysis
-                    ? "Let Traktor finish analyzing the stereo master. Then choose Close Traktor & Install. The app will close Traktor, verify the saved analysis, install the stems, and reopen Traktor."
-                    : "Let Traktor finish analyzing the stereo master. Then choose Close Traktor & Check Master. The app will close Traktor, verify the saved analysis, and reopen it.", "arrow.right.circle.fill", .blue)
-            }
+        case .prepareMasterInTraktor:
             return ("PREPARE MASTER IN TRAKTOR", "Traktor must analyze the exact stereo master before lossless stems can be installed. Choose Open Traktor & Show Master, then drag the highlighted file into Track Collection—not onto a deck.", "waveform.badge.magnifyingglass", .blue)
+        case .saveTraktorAndRefresh:
+            return ("SAVE TRAKTOR CHANGES", "Traktor is open, so recent library changes may not be in its saved collection yet. Choose Save & Quit Traktor, Then Refresh. The app will wait for Traktor to close and update automatically.", "arrow.triangle.2.circlepath.circle.fill", .orange)
+        case .addStems:
+            let message = model.mode == .portableAAC
+                ? "Add the remaining stem files. You can choose several at once or place them in the slots below."
+                : "The analyzed master was found. Add the remaining four stems."
+            return ("ADD AUDIO", message, "waveform.badge.plus", .blue)
+        case .readyToCreateAAC:
+            return ("READY TO CREATE", "Review the metadata, then create the AAC Stem file. Drag the finished .stem.mp4 directly into Traktor; all four stems will be present.", "checkmark.circle.fill", .green)
+        case .readyToInstallLossless:
+            return ("READY TO INSTALL", "The analyzed master and all five files are ready. Choose Verify & Install Lossless Stems below.", "checkmark.circle.fill", .green)
         }
-        if model.traktorRunning && model.hasAllFiles {
-            return ("READY TO VERIFY", "Traktor is open, so its current library state may not be saved yet. Choose Close Traktor & Verify / Install. The app will save and recheck the latest collection before changing anything.", "checkmark.circle.fill", .blue)
-        }
-        if !model.hasAllFiles {
-            return ("ADD AUDIO", "The analyzed master was found. Add the remaining four stems.", "waveform.badge.plus", .blue)
-        }
-        return ("READY TO INSTALL", "The analyzed master and all five files are ready. Choose Verify & Install Lossless Stems below.", "checkmark.circle.fill", .green)
     }
 
     private var workflowGuide: some View {
@@ -499,7 +475,7 @@ struct ContentView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
                 Button("REFRESH TRAKTOR STATUS") {
-                    Task { await model.auditTraktorState(explainChange: true) }
+                    Task { await model.refreshTraktorStateFromUser() }
                 }
                 .font(.system(size: 8.5, weight: .semibold))
                 .buttonStyle(.bordered)
@@ -552,7 +528,7 @@ struct ContentView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("v0.6.0-beta.20")
+                Text("v0.6.0-beta.21")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.62))
                 Text("AAC + VERIFIED LOSSLESS")
@@ -781,7 +757,7 @@ struct ContentView: View {
                 .font(.system(size: 10))
                 .foregroundStyle(Color.white.opacity(0.32))
             Spacer()
-            if case .complete = model.state {
+            if model.workflowPhase == .installed {
                 if model.mode == .portableAAC {
                     Button("SHOW STEM FILE IN FINDER") { model.revealOutput() }
                         .buttonStyle(.borderedProminent)
@@ -791,13 +767,14 @@ struct ContentView: View {
                         .buttonStyle(.borderedProminent)
                         .tint(.green)
                 }
-            } else if model.mode == .portableAAC || model.nativeReadiness?.ready == true {
+            } else if model.workflowPhase == .readyToCreateAAC ||
+                        model.workflowPhase == .readyToInstallLossless {
                 Button(model.primaryActionTitle) {
                     Task { await model.create() }
                 }
                     .buttonStyle(.borderedProminent)
-                    .tint(model.canCreate ? .orange : Color(red: 0.32, green: 0.34, blue: 0.37))
-                    .disabled(!(model.canCreate || model.canResolveUnsavedAnalysis))
+                    .tint(.orange)
+                    .disabled(!model.canCreate)
             }
         }
         .padding(.horizontal, 16)
@@ -816,7 +793,7 @@ struct ContentView: View {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.jpeg, .png]
         panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK { model.setArtwork(panel.url) }
+        presentOpenPanel(panel) { accepted in model.setArtwork(accepted.url) }
     }
 
     private func chooseAudioFolder() {
@@ -827,7 +804,8 @@ struct ContentView: View {
         panel.canChooseDirectories = true
         panel.canCreateDirectories = false
         panel.message = "Choose a folder containing one stereo master and four stems"
-        if panel.runModal() == .OK, let directory = panel.url {
+        presentOpenPanel(panel) { accepted in
+            guard let directory = accepted.url else { return }
             model.recordAudioSelection(directory)
             model.importFolder(directory)
         }
@@ -841,7 +819,8 @@ struct ContentView: View {
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.message = "Choose the stereo master used for this package"
-        if panel.runModal() == .OK, let file = panel.url {
+        presentOpenPanel(panel) { accepted in
+            guard let file = accepted.url else { return }
             model.recordAudioSelection(file)
             model.setFile(file, for: .master)
         }
@@ -856,9 +835,25 @@ struct ContentView: View {
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.message = "Choose up to \(missingCount) remaining stem file\(missingCount == 1 ? "" : "s")"
-        if panel.runModal() == .OK {
-            if let first = panel.urls.first { model.recordAudioSelection(first) }
-            model.addStemFiles(Array(panel.urls.prefix(missingCount)))
+        presentOpenPanel(panel) { accepted in
+            if let first = accepted.urls.first { model.recordAudioSelection(first) }
+            model.addStemFiles(Array(accepted.urls.prefix(missingCount)))
+        }
+    }
+
+    private func presentOpenPanel(_ panel: NSOpenPanel, onAccept: @escaping (NSOpenPanel) -> Void) {
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        DispatchQueue.main.async {
+            if let window = NSApplication.shared.windows.first(where: { $0.isVisible && !$0.isSheet }) {
+                window.makeKeyAndOrderFront(nil)
+                panel.beginSheetModal(for: window) { response in
+                    if response == .OK { onAccept(panel) }
+                }
+            } else {
+                panel.begin { response in
+                    if response == .OK { onAccept(panel) }
+                }
+            }
         }
     }
 
@@ -875,7 +870,7 @@ struct ContentView: View {
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.message = "Choose Traktor Pro 4 collection.nml"
-        if panel.runModal() == .OK { model.setCollection(panel.url) }
+        presentOpenPanel(panel) { accepted in model.setCollection(accepted.url) }
     }
 
     private func chooseStemsDirectory() {
@@ -885,7 +880,7 @@ struct ContentView: View {
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true
         panel.message = "Choose the Stems folder configured in Traktor Pro 4"
-        if panel.runModal() == .OK { model.setStemsDirectory(panel.url) }
+        presentOpenPanel(panel) { accepted in model.setStemsDirectory(accepted.url) }
     }
 
     private var statusIcon: String {
