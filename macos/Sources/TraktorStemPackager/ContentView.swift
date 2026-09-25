@@ -212,7 +212,7 @@ struct ContentView: View {
                             .interpolation(.high)
                             .frame(width: 58, height: 58)
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("HOW TO USE TRAKTOR STEM PACKAGER")
+                            Text("USER GUIDE")
                                 .font(.system(size: 16, weight: .bold))
                                 .tracking(0.6)
                             Text("Choose one of the two workflows below.")
@@ -259,9 +259,9 @@ struct ContentView: View {
                         number: "2",
                         icon: "waveform.badge.checkmark",
                         accent: Color(red: 0.82, green: 0.20, blue: 0.96),
-                        title: "LOSSLESS TRAKTOR INSTALLATION",
-                        bestFor: "Choose this to preserve source PCM and keep the existing Traktor master entry.",
-                        result: "Creates a linked lossless Stem file for the original master.",
+                        title: "LOSSLESS LINKED STEMS",
+                        bestFor: "Choose this to preserve the original PCM audio. The app links four lossless stems to the exact stereo master in Traktor. If that master isn’t already in your collection, the app guides you through adding and analyzing it first.",
+                        result: "Preserves source PCM in Traktor’s linked Stem format.",
                         steps: [
                             "Add the stereo master and four matching stems to this app.",
                             "Already in Traktor? Select the exact same master file that Traktor analyzed. The app links the four stems to that existing track and preserves its cues, beat grid, loops and other Traktor data.",
@@ -560,7 +560,7 @@ struct ContentView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("v1.0.1")
+                Text("v1.0.2")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.62))
                 Text("AAC + VERIFIED LOSSLESS")
@@ -584,7 +584,7 @@ struct ContentView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 5))
                     }
                     .buttonStyle(.plain)
-                    Button("HOW TO USE") { showWorkflowGuide = true }
+                    Button("USER GUIDE") { showWorkflowGuide = true }
                         .buttonStyle(.plain)
                         .foregroundStyle(Color.white.opacity(0.55))
                 }

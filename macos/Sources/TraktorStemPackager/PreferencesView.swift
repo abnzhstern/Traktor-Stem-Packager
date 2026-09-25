@@ -17,7 +17,7 @@ struct PreferencesView: View {
             }
 
             Toggle("Open Traktor automatically after AAC export", isOn: $openTraktorAfterAAC)
-            Toggle("Show “How It Works” when the app opens", isOn: showGuideBinding)
+            Toggle("Show User Guide when the app opens", isOn: showGuideBinding)
 
             Section("Audio Files") {
                 Picker("Starting folder", selection: audioFolderBehaviorBinding) {

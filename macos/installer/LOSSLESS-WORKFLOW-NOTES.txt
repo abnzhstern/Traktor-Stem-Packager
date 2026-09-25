@@ -1,4 +1,4 @@
-TRAKTOR STEM PACKAGER — LOSSLESS TRAKTOR INSTALLATION
+TRAKTOR STEM PACKAGER — LOSSLESS LINKED STEMS
 
 Traktor Stem Packager does not create or separate stems. Start with four stems
 you already created or received, plus the matching stereo master.
@@ -14,7 +14,7 @@ time. The app does not resample, normalize, time-stretch, or remix them.
 
 HOW TO INSTALL LOSSLESS STEMS
 
-1. Select “Lossless Traktor Installation.”
+1. Select “Lossless Linked Stems.”
 2. Confirm the Collection and Stems folder paths shown by the app.
 3. Add the exact stereo master in the Master slot. Add the four matching stems
    individually, select them together, or use Import Folder.

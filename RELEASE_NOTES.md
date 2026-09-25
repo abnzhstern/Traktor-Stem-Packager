@@ -1,6 +1,13 @@
+# Version 1.0.2
+
+- Renamed the in-app help page, header button, and launch preference consistently to “User Guide.”
+- Renamed the lossless workflow to “Lossless Linked Stems” so its name accurately distinguishes it from the standalone AAC Stem File workflow.
+- Clarified that the lossless workflow preserves source PCM by linking four lossless stems to the exact stereo master in Traktor, guiding users through adding and analyzing the master first when necessary.
+- No audio engine, packaging, metadata, Traktor-linking, or workflow behavior changed.
+
 # Version 1.0.1
 
-- Renamed the launch-guide preference to “Show ‘How It Works’ when the app opens,” making its behavior match the visible How It Works button.
+- Clarified the launch-guide preference wording without changing its behavior.
 - No audio engine, packaging, metadata, Traktor-linking, or workflow behavior changed.
 
 # Version 1.0.0
@@ -45,7 +52,7 @@ First stable public release of Traktor Stem Packager.
 - Stem labels are now plain text until the user explicitly chooses the pencil control, permanently preventing DRUMS from opening in edit mode.
 - Audio pickers remember the last-used folder by default; Preferences can instead set a fixed starting audio folder.
 - Removed irrelevant Traktor-closing information from Mac Security setup and clarified that users must scroll to Security after macOS opens Privacy & Security.
-- The main window is explicitly reactivated after closing How to Use so the orange next action is immediately visible.
+- The main window is explicitly reactivated after closing User Guide so the orange next action is immediately visible.
 
 # Version 0.6.0-beta.19
 
@@ -59,7 +66,7 @@ First stable public release of Traktor Stem Packager.
 # Version 0.6.0-beta.18
 
 - Manual file entry and folder import now use the same explicit Review Assignments → Accept Assignments → orange next-action sequence.
-- The persistent Traktor control is now a distinct black button with an icon, separate from the secondary How to Use control.
+- The persistent Traktor control is now a distinct black button with an icon, separate from the secondary User Guide control.
 - Removed inaccurate Automation-permission instructions. Traktor Stem Packager does not require Automation permission to request a normal quit.
 - App Management guidance now explains that Terminal appears only after macOS blocks an installation attempt.
 - If Traktor remains open, the app brings it forward and gives a direct Command-Q fallback while continuing to monitor for closure.

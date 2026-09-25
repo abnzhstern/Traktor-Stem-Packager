@@ -66,7 +66,7 @@ jobs:
           grep -F "Text(\"v$PACKAGE_VERSION\")" macos/Sources/TraktorStemPackager/ContentView.swift
           grep -F 'Text("CHOOSE ONE OF TWO WORKFLOWS")' macos/Sources/TraktorStemPackager/ContentView.swift
           grep -F 'case .rememberLastUsed: "Remember Last Used"' macos/Sources/TraktorStemPackager/AudioRole.swift
-          grep -F 'case .nativeLossless: "Lossless Traktor Installation"' macos/Sources/TraktorStemPackager/AudioRole.swift
+          grep -F 'case .nativeLossless: "Lossless Linked Stems"' macos/Sources/TraktorStemPackager/AudioRole.swift
           codesign --verify --deep --strict "$APP"
           file "$APP/Contents/MacOS/TraktorStemPackager" | grep arm64
           file "$APP/Contents/Resources/Runtime/node" | grep arm64

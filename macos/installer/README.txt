@@ -9,7 +9,7 @@ Traktor Stem Packager does not create or separate stems. It packages four stems 
 CHOOSE ONE OF TWO WORKFLOWS
 
 1. AAC Stem File creates one simple, shareable 320 kbps AAC .stem.mp4.
-2. Lossless Traktor Installation preserves the source PCM and links the stems to the existing Traktor master entry.
+2. Lossless Linked Stems preserves the source PCM and links the stems to the existing Traktor master entry.
 
 In the app, orange always marks the one action to take next. Blue explains the current step, green means ready or complete, and red identifies a problem that must be corrected.
 
@@ -94,6 +94,6 @@ Open Traktor / Bring Traktor Forward remains available in the app header as a ne
 
 PREFERENCES
 
-Choose Traktor Stem Packager > Settings to control which workflow appears at launch, whether Traktor opens automatically after an AAC export, and whether Before You Begin appears at launch. "Remember Last Used" is the default startup choice.
+Choose Traktor Stem Packager > Settings to control which workflow appears at launch, whether Traktor opens automatically after an AAC export, and whether the User Guide appears at launch. "Remember Last Used" is the default startup choice.
 
 The selected Traktor Collection and Stems folder are remembered between launches. You can change either location for another Traktor installation or an external drive. If a saved drive is disconnected, the app marks it unavailable and keeps the selection instead of silently switching to another folder. Use Reset to Detected Defaults to return to the automatically detected locations.

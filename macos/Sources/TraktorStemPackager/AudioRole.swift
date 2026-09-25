@@ -9,7 +9,7 @@ enum PackagingMode: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .portableAAC: "AAC Stem File"
-        case .nativeLossless: "Lossless Traktor Installation"
+        case .nativeLossless: "Lossless Linked Stems"
         }
     }
     var subtitle: String {
@@ -36,7 +36,7 @@ enum StartupWorkflow: String, CaseIterable, Identifiable {
         switch self {
         case .rememberLastUsed: "Remember Last Used"
         case .portableAAC: "AAC Stem File"
-        case .nativeLossless: "Lossless Traktor Installation"
+        case .nativeLossless: "Lossless Linked Stems"
         }
     }
 }
