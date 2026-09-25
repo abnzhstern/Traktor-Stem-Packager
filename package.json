@@ -1,6 +1,6 @@
 {
   "name": "traktor-stem-packager",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "description": "Self-contained macOS utility for packaging existing stems for Traktor Pro 4",

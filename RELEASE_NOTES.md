@@ -1,3 +1,8 @@
+# Version 1.0.1
+
+- Renamed the launch-guide preference to “Show ‘How It Works’ when the app opens,” making its behavior match the visible How It Works button.
+- No audio engine, packaging, metadata, Traktor-linking, or workflow behavior changed.
+
 # Version 1.0.0
 
 First stable public release of Traktor Stem Packager.
