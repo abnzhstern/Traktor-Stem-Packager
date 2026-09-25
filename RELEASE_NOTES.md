@@ -1,3 +1,12 @@
+# Version 0.6.0-beta.22
+
+- Restored the proven beta 20 workflow and status presentation after beta 21’s global phase system hid important Traktor state and controls.
+- A successful lossless installation now remains Complete while its saved Traktor link and Stem file are still present, preventing the reinstall loop.
+- Refresh Traktor Status preserves the detailed saved-state result. When Traktor is open, the same status row exposes a visible orange Save & Quit Traktor, Then Refresh button.
+- The app waits for Traktor to close, rereads the saved collection, and reports whether the exact master is analyzed, missing, linked, or ready for installation.
+- Add Remaining Stems is orange whenever it is the valid next action, without depending on the old waiting-state gate.
+- Main-window file pickers remain attached to the app window to prevent hidden modal dialogs and unexplained macOS beeps.
+
 # Version 0.6.0-beta.21
 
 - Rebuilt the visible workflow around one authoritative phase at a time, so the interface cannot simultaneously guide conflicting actions.
