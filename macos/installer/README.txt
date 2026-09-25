@@ -17,7 +17,7 @@ AAC STEM FILE WORKFLOW
 
 The AAC workflow creates one shareable .stem.mp4 file. Drag that finished .stem.mp4 directly into Traktor's Track Collection or a deck; the four packaged stems will be present automatically. No master-track analysis or linked-folder setup is required for this workflow. Traktor treats the finished .stem.mp4 as a new track, so cues, beat grids, loops, and play history from a separate stereo-master entry do not transfer automatically.
 
-Files can be added individually, or Import Folder can propose assignments from a folder containing exactly five supported audio files. Always review the proposed assignments before accepting them. Drag a file onto another slot to reassign it. Accepted assignments lock; choose Edit Assignments to change them. After either manual entry or folder import is accepted and verified, the orange primary action becomes available. Clear All empties the queue without deleting source files.
+Files can be added individually, or Import Folder can propose assignments from a folder containing exactly five supported audio files. Always review the proposed assignments before accepting them. Drag a file onto another slot to reassign it. Accepted assignments lock; choose Edit Assignments to change them. After either manual entry or folder import is accepted and verified, the orange primary action becomes available. Start New Package (Command-N) resets the current package without deleting source files or changing saved workflow and folder preferences.
 
 IMPORTANT
 Keep these two items together in this folder:

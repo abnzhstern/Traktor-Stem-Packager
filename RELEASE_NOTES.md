@@ -1,3 +1,12 @@
+# Version 0.6.0-beta.19
+
+- Replaced numbered workflow jumps with clear states: Add Audio, Prepare Master in Traktor, Review Assignments, and Ready to Create or Install.
+- Orange now marks the single next action: Add Master, Add Remaining Stems, Accept Assignments, or Create/Install.
+- Added multi-file selection for remaining stems while keeping drag-and-drop reassignment and explicit acceptance.
+- Added Start New Package with Command-N. It clears all transient package state, cancels stale background work, and preserves workflow and folder preferences.
+- Security instructions now include live buttons beside the matching Privacy & Security and App Management steps.
+- Removed the duplicate AAC footer Open Traktor button and prevented an editable stem label from taking focus on launch.
+
 # Version 0.6.0-beta.18
 
 - Manual file entry and folder import now use the same explicit Review Assignments → Accept Assignments → orange next-action sequence.

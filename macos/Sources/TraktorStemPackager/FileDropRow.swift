@@ -8,6 +8,7 @@ struct FileDropRow: View {
     let isValidated: Bool
     let isLocked: Bool
     let hasProblem: Bool
+    let focusedRole: FocusState<AudioRole?>.Binding
     let select: (URL) -> Void
     let clear: () -> Void
 
@@ -21,6 +22,7 @@ struct FileDropRow: View {
                     Text("Master").font(.system(size: 13, weight: .semibold))
                 } else {
                     TextField(role.rawValue, text: $displayName)
+                        .focused(focusedRole, equals: role)
                         .textFieldStyle(.plain)
                         .font(.system(size: 13, weight: .semibold))
                         .help("Editable display name. The internal stem role remains \(role.rawValue).")

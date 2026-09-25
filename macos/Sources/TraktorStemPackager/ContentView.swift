@@ -7,6 +7,7 @@ struct ContentView: View {
     @EnvironmentObject private var updateChecker: UpdateChecker
     @State private var showDetails = false
     @State private var showWorkflowGuide = false
+    @FocusState private var focusedStemRole: AudioRole?
     @AppStorage("hideWorkflowGuideOnLaunch") private var hideWorkflowGuideOnLaunch = false
 
     private let panel = Color(red: 0.105, green: 0.11, blue: 0.125)
@@ -39,7 +40,12 @@ struct ContentView: View {
         .background(background)
         .preferredColorScheme(.dark)
         .onAppear {
+            focusedStemRole = nil
             if !hideWorkflowGuideOnLaunch { showWorkflowGuide = true }
+        }
+        .onChange(of: model.resetGeneration) { _ in
+            focusedStemRole = nil
+            showDetails = false
         }
         .sheet(isPresented: $showWorkflowGuide) {
             workflowGuide
@@ -86,6 +92,25 @@ struct ContentView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
+            if model.state == .waiting && !model.assignmentsNeedReview {
+                if model.files[.master] == nil {
+                    VStack(alignment: .trailing, spacing: 6) {
+                        Button("ADD MASTER") { chooseMasterFile() }
+                            .font(.system(size: 9, weight: .semibold))
+                            .buttonStyle(.borderedProminent)
+                            .tint(.orange)
+                        Button("OR IMPORT FOLDER") { chooseAudioFolder() }
+                            .font(.system(size: 9, weight: .semibold))
+                            .buttonStyle(.bordered)
+                    }
+                } else if !model.hasAllFiles &&
+                            (model.mode == .portableAAC || model.nativeReadiness?.ready == true) {
+                    Button("ADD REMAINING STEMS") { chooseRemainingStemFiles() }
+                        .font(.system(size: 9, weight: .semibold))
+                        .buttonStyle(.borderedProminent)
+                        .tint(.orange)
+                }
+            }
             if model.mode == .nativeLossless,
                model.files[.master] != nil,
                !model.assignmentsNeedReview,
@@ -140,17 +165,20 @@ struct ContentView: View {
         }
 
         if model.mode == .portableAAC {
-            if !model.hasAllFiles {
-                return ("STEP 1", "Add your master and four stem files, or import a five-file folder.", "1.circle.fill", .blue)
+            if model.files[.master] == nil {
+                return ("ADD AUDIO", "Add the stereo master first, or import a folder containing the master and four stems.", "waveform.badge.plus", .blue)
             }
-            return ("STEP 2", "Review the metadata, then create the AAC Stem file. Drag the finished .stem.mp4 directly into Traktor; all four stems will be present.", "2.circle.fill", .green)
+            if !model.hasAllFiles {
+                return ("ADD AUDIO", "Add the remaining stem files. You can choose several at once or place them in the slots below.", "waveform.badge.plus", .blue)
+            }
+            return ("READY TO CREATE", "Review the metadata, then create the AAC Stem file. Drag the finished .stem.mp4 directly into Traktor; all four stems will be present.", "checkmark.circle.fill", .green)
         }
 
         if model.files[.master] == nil {
-            return ("STEP 1", "Start by adding the stereo master in the Master slot. You may also add the four stems now—individually or with Import Folder—or add them later.", "1.circle.fill", .blue)
+            return ("ADD AUDIO", "Add the exact stereo master used in Traktor first, or import a folder containing the master and four stems.", "waveform.badge.plus", .blue)
         }
         if model.collectionURL == nil || model.stemsDirectoryURL == nil {
-            return ("STEP 2", "Confirm the Traktor Collection and Stems folder locations below.", "2.circle.fill", .blue)
+            return ("CHOOSE TRAKTOR LOCATIONS", "Confirm the Traktor Collection and Stems folder locations below.", "folder.badge.gearshape", .blue)
         }
         if model.nativeReadiness == nil {
             return ("CHECKING TRAKTOR", "Checking the master against Traktor’s saved collection…", "magnifyingglass.circle.fill", .blue)
@@ -161,13 +189,13 @@ struct ContentView: View {
                     ? "Let Traktor finish analyzing the stereo master. Then choose Close Traktor & Install. The app will close Traktor, verify the saved analysis, install the stems, and reopen Traktor."
                     : "Let Traktor finish analyzing the stereo master. Then choose Close Traktor & Check Master. The app will close Traktor, verify the saved analysis, and reopen it.", "arrow.right.circle.fill", .blue)
             }
-            return ("STEP 3", "Traktor must analyze the exact stereo master before lossless stems can be installed. Choose Open Traktor & Show Master, then drag the highlighted file into Track Collection—not onto a deck.", "3.circle.fill", .blue)
+            return ("PREPARE MASTER IN TRAKTOR", "Traktor must analyze the exact stereo master before lossless stems can be installed. Choose Open Traktor & Show Master, then drag the highlighted file into Track Collection—not onto a deck.", "waveform.badge.magnifyingglass", .blue)
         }
         if model.traktorRunning && model.hasAllFiles {
             return ("READY TO VERIFY", "Traktor is open, so its current library state may not be saved yet. Choose Close Traktor & Verify / Install. The app will save and recheck the latest collection before changing anything.", "checkmark.circle.fill", .blue)
         }
         if !model.hasAllFiles {
-            return ("STEP 4", "The analyzed master was found. Add the remaining four stems or import their five-file folder.", "4.circle.fill", .blue)
+            return ("ADD AUDIO", "The analyzed master was found. Add the remaining four stems.", "waveform.badge.plus", .blue)
         }
         return ("READY TO INSTALL", "The analyzed master and all five files are ready. Choose Verify & Install Lossless Stems below.", "checkmark.circle.fill", .green)
     }
@@ -259,15 +287,19 @@ struct ContentView: View {
                             .font(.system(size: 10))
                             .foregroundStyle(Color.white.opacity(0.62))
                             .fixedSize(horizontal: false, vertical: true)
-                        securityStep("1", "If macOS blocks the first launch, open Privacy & Security, scroll to Security, choose Open Anyway, then confirm Open.")
-                        securityStep("2", "If the installer says Terminal was prevented from modifying apps, open App Management and enable Terminal. Terminal may not appear until macOS has actually blocked an installation attempt.")
+                        securityStep(
+                            "1",
+                            "If macOS blocks the first launch, open Privacy & Security, scroll to Security, choose Open Anyway, then confirm Open.",
+                            buttonTitle: "OPEN PRIVACY & SECURITY",
+                            action: model.openPrivacyAndSecurity
+                        )
+                        securityStep(
+                            "2",
+                            "If the installer says Terminal was prevented from modifying apps, open App Management and enable Terminal. Terminal may not appear until macOS has actually blocked an installation attempt.",
+                            buttonTitle: "OPEN APP MANAGEMENT",
+                            action: model.openAppManagementSettings
+                        )
                         securityStep("3", "Closing Traktor does not require Automation permission. The app first asks Traktor to quit normally. If Traktor stays open, press Command-Q in Traktor; this app detects the closure and continues.")
-                        HStack(spacing: 8) {
-                            Button("GENERAL SECURITY") { model.openPrivacyAndSecurity() }
-                            Button("APP MANAGEMENT — ONLY IF PROMPTED") { model.openAppManagementSettings() }
-                        }
-                        .font(.system(size: 9, weight: .semibold))
-                        .buttonStyle(.bordered)
                     }
                     .padding(11)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -369,7 +401,12 @@ struct ContentView: View {
         .overlay(Rectangle().stroke(accent.opacity(0.28), lineWidth: 1))
     }
 
-    private func securityStep(_ number: String, _ text: String) -> some View {
+    private func securityStep(
+        _ number: String,
+        _ text: String,
+        buttonTitle: String? = nil,
+        action: (() -> Void)? = nil
+    ) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Text(number)
                 .font(.system(size: 9, weight: .bold))
@@ -380,6 +417,12 @@ struct ContentView: View {
                 .font(.system(size: 9.5))
                 .foregroundStyle(Color.white.opacity(0.62))
                 .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+            if let buttonTitle, let action {
+                Button(buttonTitle, action: action)
+                    .font(.system(size: 8.5, weight: .semibold))
+                    .buttonStyle(.bordered)
+            }
         }
     }
 
@@ -488,7 +531,7 @@ struct ContentView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("v0.6.0-beta.18")
+                Text("v0.6.0-beta.19")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.62))
                 Text("AAC + VERIFIED LOSSLESS")
@@ -595,7 +638,7 @@ struct ContentView: View {
                     Button("ACCEPT ASSIGNMENTS") { model.confirmAssignments() }
                         .font(.system(size: 9, weight: .semibold))
                         .buttonStyle(.borderedProminent)
-                        .tint(Color.orange.opacity(0.8))
+                        .tint(.orange)
                 } else if model.state == .validating {
                     ProgressView().controlSize(.small)
                     Text("CHECKING FILES")
@@ -627,9 +670,10 @@ struct ContentView: View {
                         .buttonStyle(.bordered)
                 }
                 if !model.files.isEmpty {
-                    Button("CLEAR ALL") { model.clearAll() }
+                    Button("START NEW PACKAGE") { model.startNewPackage() }
                         .font(.system(size: 9, weight: .semibold))
                         .buttonStyle(.bordered)
+                        .disabled(!model.canStartNewPackage)
                 }
             }
             .padding(.horizontal, 2)
@@ -642,6 +686,7 @@ struct ContentView: View {
                     isValidated: model.audioSetValidated,
                     isLocked: model.assignmentsLocked,
                     hasProblem: model.validationProblemRoles.contains(role),
+                    focusedRole: $focusedStemRole,
                     select: { model.setFile($0, for: role) },
                     clear: { model.clear(role) }
                 )
@@ -715,8 +760,6 @@ struct ContentView: View {
             Spacer()
             if case .complete = model.state {
                 if model.mode == .portableAAC {
-                    Button("OPEN TRAKTOR") { model.openTraktor() }
-                        .buttonStyle(.bordered)
                     Button("SHOW STEM FILE IN FINDER") { model.revealOutput() }
                         .buttonStyle(.borderedProminent)
                         .tint(.green)
@@ -762,6 +805,31 @@ struct ContentView: View {
         panel.message = "Choose a folder containing one stereo master and four stems"
         if panel.runModal() == .OK, let directory = panel.url {
             model.importFolder(directory)
+        }
+    }
+
+    private func chooseMasterFile() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.audio]
+        panel.allowsMultipleSelection = false
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.message = "Choose the stereo master used for this package"
+        if panel.runModal() == .OK, let file = panel.url {
+            model.setFile(file, for: .master)
+        }
+    }
+
+    private func chooseRemainingStemFiles() {
+        let missingCount = AudioRole.allCases.filter { $0 != .master && model.files[$0] == nil }.count
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.audio]
+        panel.allowsMultipleSelection = true
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.message = "Choose up to \(missingCount) remaining stem file\(missingCount == 1 ? "" : "s")"
+        if panel.runModal() == .OK {
+            model.addStemFiles(Array(panel.urls.prefix(missingCount)))
         }
     }
 

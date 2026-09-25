@@ -43,8 +43,13 @@ final class PackagerModel: ObservableObject {
     @Published var assignmentsNeedReview = false
     @Published private(set) var validationAccepted = false
     @Published var waitingForManualTraktorQuit = false
+    @Published private(set) var resetGeneration = 0
     private var extractedArtworkURL: URL?
     private var readinessTask: Task<Void, Never>?
+    private var validationTask: Task<Void, Never>?
+    private var metadataTask: Task<Void, Never>?
+    private var workflowGeneration = 0
+    private var metadataGeneration = 0
 
     init() {
         let manager = FileManager.default
@@ -96,6 +101,7 @@ final class PackagerModel: ObservableObject {
     var hasAllFiles: Bool { AudioRole.allCases.allSatisfy { files[$0] != nil } }
     var audioSetValidated: Bool { hasAllFiles && validationAccepted && report != nil }
     var assignmentsLocked: Bool { audioSetValidated && !assignmentsNeedReview }
+    var canStartNewPackage: Bool { state != .packaging && !waitingForManualTraktorQuit }
     var canCreate: Bool {
         state == .ready && audioSetValidated &&
             (mode == .portableAAC || (collectionURL != nil && stemsDirectoryURL != nil && nativeReadiness?.ready == true))
@@ -115,6 +121,7 @@ final class PackagerModel: ObservableObject {
     }
 
     func setMode(_ newMode: PackagingMode) {
+        invalidatePendingWork()
         mode = newMode
         UserDefaults.standard.set(newMode.rawValue, forKey: Self.lastUsedModeKey)
         report = nil
@@ -131,6 +138,7 @@ final class PackagerModel: ObservableObject {
 
     func setFile(_ url: URL, for role: AudioRole) {
         guard !assignmentsLocked else { return }
+        invalidatePendingWork()
         let previousMaster = files[.master]
         if let sourceRole = files.first(where: { $0.value.standardizedFileURL == url.standardizedFileURL })?.key,
            sourceRole != role {
@@ -151,12 +159,29 @@ final class PackagerModel: ObservableObject {
             : "Add your master and four stem files, or import a five-file folder."
         if files[.master] != previousMaster, let master = files[.master] {
             title = master.deletingPathExtension().lastPathComponent
-            Task { await loadMasterMetadata(from: master) }
-            refreshNativeReadiness()
+            startMetadataLoad(from: master)
+        }
+        refreshNativeReadiness()
+    }
+
+    func addStemFiles(_ urls: [URL]) {
+        guard !assignmentsLocked else { return }
+        var remainingRoles = AudioRole.allCases.filter { $0 != .master && files[$0] == nil }
+        for url in urls where !remainingRoles.isEmpty {
+            let role: AudioRole
+            if let suggested = suggestedRole(for: url), suggested != .master,
+               let index = remainingRoles.firstIndex(of: suggested) {
+                role = suggested
+                remainingRoles.remove(at: index)
+            } else {
+                role = remainingRoles.removeFirst()
+            }
+            setFile(url, for: role)
         }
     }
 
     func importFolder(_ directory: URL) {
+        invalidatePendingWork()
         let supported = Set(["wav", "wave", "aif", "aiff", "m4a", "aac", "mp3"])
         report = nil
         validationAccepted = false
@@ -204,7 +229,7 @@ final class PackagerModel: ObservableObject {
             statusText = "Review the assignments. Drag files between slots to reassign them, then choose Accept Assignments."
             if let master = files[.master] {
                 title = master.deletingPathExtension().lastPathComponent
-                Task { await loadMasterMetadata(from: master) }
+                startMetadataLoad(from: master)
             }
             refreshNativeReadiness()
         } catch {
@@ -219,7 +244,10 @@ final class PackagerModel: ObservableObject {
         guard assignmentsNeedReview, hasAllFiles else { return }
         assignmentsNeedReview = false
         statusText = "Checking compatibility…"
-        Task { await validate() }
+        validationTask?.cancel()
+        validationTask = Task { [weak self] in
+            await self?.validate()
+        }
     }
 
     func editAssignments() {
@@ -248,6 +276,7 @@ final class PackagerModel: ObservableObject {
     }
 
     func clear(_ role: AudioRole) {
+        invalidatePendingWork()
         files[role] = nil
         report = nil
         validationAccepted = false
@@ -257,6 +286,7 @@ final class PackagerModel: ObservableObject {
         state = .waiting
         statusText = "Add your master and four stem files, or import a five-file folder."
         if role == .master {
+            cancelMetadataLoad()
             title = ""
             artist = ""
             album = ""
@@ -267,11 +297,15 @@ final class PackagerModel: ObservableObject {
             discardExtractedArtwork()
             artworkURL = nil
             nativeReadiness = nil
+        } else {
+            refreshNativeReadiness()
         }
     }
 
-    func clearAll() {
-        readinessTask?.cancel()
+    func startNewPackage() {
+        guard canStartNewPackage else { return }
+        invalidatePendingWork()
+        cancelMetadataLoad()
         files.removeAll()
         report = nil
         validationAccepted = false
@@ -291,7 +325,23 @@ final class PackagerModel: ObservableObject {
         stemNames = [.drums: "Drums", .bass: "Bass", .other: "Other", .vocals: "Vocals"]
         discardExtractedArtwork()
         artworkURL = nil
-        statusText = "Queue cleared. Add your master and four stem files, or import a five-file folder."
+        resetGeneration += 1
+        statusText = "Ready for a new package. Add your master and four stem files, or import a five-file folder."
+        refreshTraktorStatus()
+    }
+
+    private func invalidatePendingWork() {
+        workflowGeneration += 1
+        validationTask?.cancel()
+        validationTask = nil
+        readinessTask?.cancel()
+        readinessTask = nil
+    }
+
+    private func cancelMetadataLoad() {
+        metadataGeneration += 1
+        metadataTask?.cancel()
+        metadataTask = nil
     }
 
     func setCollection(_ url: URL?) {
@@ -500,11 +550,21 @@ final class PackagerModel: ObservableObject {
         artworkURL = url
     }
 
-    private func loadMasterMetadata(from url: URL) async {
+    private func startMetadataLoad(from url: URL) {
+        cancelMetadataLoad()
+        let generation = metadataGeneration
+        metadataTask = Task { [weak self] in
+            await self?.loadMasterMetadata(from: url, generation: generation)
+        }
+    }
+
+    private func loadMasterMetadata(from url: URL, generation: Int) async {
         do {
             let bridge = try EngineBridge()
             let metadata = try await bridge.readMasterMetadata(master: url)
-            guard files[.master] == url else { return }
+            guard !Task.isCancelled,
+                  metadataGeneration == generation,
+                  files[.master] == url else { return }
             title = metadata.title
             artist = metadata.artist
             album = metadata.album
@@ -536,6 +596,7 @@ final class PackagerModel: ObservableObject {
 
     func validate() async {
         guard hasAllFiles else { return }
+        let generation = workflowGeneration
         let validationFiles = files
         let validationMode = mode
         validationAccepted = false
@@ -545,7 +606,10 @@ final class PackagerModel: ObservableObject {
         do {
             let bridge = try EngineBridge()
             let result = try await bridge.validate(files: validationFiles, mode: validationMode)
-            guard files == validationFiles, mode == validationMode else { return }
+            guard !Task.isCancelled,
+                  workflowGeneration == generation,
+                  files == validationFiles,
+                  mode == validationMode else { return }
             report = result
             validationProblemRoles = []
             validationAccepted = true
@@ -554,7 +618,10 @@ final class PackagerModel: ObservableObject {
                 ? String(format: "Accepted. All five files match. Peak protection is enabled at a −0.3 dBFS ceiling because the combined peak is %.1f dBFS.", result.stemSumTruePeakDbfs)
                 : String(format: "Accepted. All five files match. Peak protection is not needed; the combined peak is %.1f dBFS.", result.stemSumTruePeakDbfs)
         } catch {
-            guard files == validationFiles, mode == validationMode else { return }
+            guard !Task.isCancelled,
+                  workflowGeneration == generation,
+                  files == validationFiles,
+                  mode == validationMode else { return }
             validationAccepted = false
             validationProblemRoles = problemRoles(from: error.localizedDescription)
             state = .failed(error.localizedDescription)

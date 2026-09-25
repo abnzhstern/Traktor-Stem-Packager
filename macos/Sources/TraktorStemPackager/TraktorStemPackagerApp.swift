@@ -14,17 +14,17 @@ struct TraktorStemPackagerApp: App {
         }
         .windowResizability(.contentSize)
         .commands {
+            CommandGroup(replacing: .newItem) {
+                Button("Start New Package") {
+                    model.startNewPackage()
+                }
+                .keyboardShortcut("n", modifiers: .command)
+                .disabled(!model.canStartNewPackage)
+            }
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates…") {
                     updateChecker.checkManually()
                 }
-            }
-            CommandMenu("Tracks") {
-                Button("Clear All Tracks") {
-                    model.clearAll()
-                }
-                .keyboardShortcut("k", modifiers: [.command, .shift])
-                .disabled(model.files.isEmpty)
             }
         }
 
