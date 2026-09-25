@@ -51,7 +51,7 @@ test('disables dynamics when the stem sum has safe headroom', () => {
   assert.equal(dsp.limiter.enabled, false);
 });
 
-test('lossless mode accepts only explicit 16-bit 44.1 kHz PCM', () => {
+test('lossless mode accepts only the two explicit PCM profiles', () => {
   const pcm = { codec: 'pcm_s16le', bitsPerSample: 16, sampleRate: 44100 };
   assert.doesNotThrow(() => validateNativeSourceSet({
     master: pcm, drums: pcm, bass: pcm, other: pcm, vocals: pcm,

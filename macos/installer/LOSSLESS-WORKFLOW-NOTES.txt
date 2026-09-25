@@ -1,0 +1,47 @@
+TRAKTOR STEM PACKAGER — LOSSLESS TRAKTOR INSTALLATION
+
+Traktor Stem Packager does not create or separate stems. Start with four stems
+you already created or received, plus the matching stereo master.
+
+SUPPORTED LOSSLESS SOURCES
+
+Use five matching stereo PCM WAV or AIFF files at either:
+• 16-bit / 44.1 kHz
+• 24-bit / 48 kHz
+
+The five files must have the same sample rate, bit depth, duration, and start
+time. The app does not resample, normalize, time-stretch, or remix them.
+
+HOW TO INSTALL LOSSLESS STEMS
+
+1. Select “Lossless Traktor Installation.”
+2. Confirm the Collection and Stems folder paths shown by the app.
+3. Add the exact stereo master in the Master slot. Add the four matching stems
+   individually, select them together, or use Import Folder.
+4. Review and accept the proposed assignments. Drag files between slots first
+   if an assignment needs to be corrected.
+5. If the exact master is already analyzed in Traktor, the app links the stems
+   to that existing entry and preserves its cues, beat grid, loops, play
+   history, and other Traktor data.
+6. If the master is not yet analyzed, follow the orange action to open Traktor
+   and show the master in Finder. Drag the master into Traktor's Track
+   Collection—not onto a deck—and allow analysis to finish.
+7. Follow the orange next action. Traktor must close so its latest collection
+   state is saved. The app verifies the master, installs the lossless stems,
+   and reopens Traktor. If Traktor does not close automatically, bring it
+   forward and press Command-Q; leave Traktor Stem Packager open.
+8. In Traktor, load the ORIGINAL stereo master track. The linked-stems icon
+   should appear beside it and the track should load as a Stem Deck.
+
+SAFETY AND AUDIO INTEGRITY
+
+Before editing collection.nml, the app creates a timestamped backup. If a
+linked Stem file already exists, the app asks before replacing it and keeps the
+previous file as a timestamped .bak safety backup. The .bak file is not a
+second active Stem set.
+
+Before installation, the app decodes all five packaged ALAC streams and
+requires their PCM SHA-256 hashes to match the five source files exactly.
+
+The app never installs lossless stems unless the selected master is present
+and analyzed in Traktor's latest saved collection.

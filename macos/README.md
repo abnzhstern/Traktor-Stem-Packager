@@ -23,8 +23,8 @@ The distributable application is self-contained. Its app bundle includes the val
 
 The final `.app` must be compiled on macOS with Xcode/Swift 5.10 or newer. Place arm64 macOS executables named `node`, `ffmpeg`, and `ffprobe` in `Runtime/macos-arm64`, then run `scripts/build-app.sh`. End users do not need Xcode or any separate runtime after the app has been built.
 
-The release build must use redistributable runtime binaries, include their license notices, and be signed and notarized before distribution. The development script applies only an ad-hoc signature for local testing.
+The release build uses redistributable runtime binaries and includes their license notices. Current public builds use a verified local ad-hoc signature rather than Apple Developer notarization, so the included installer and security instructions are required on some Macs.
 
-## Hosted beta build
+## Hosted release build
 
-The GitHub Actions workflow at `.github/workflows/build-macos.yml` runs the engine tests, downloads pinned arm64 Node/FFmpeg runtime files, builds the SwiftUI app, verifies the bundle and signature, and uploads a ZIP artifact. It is manually triggered from the repository's Actions page. The beta is ad-hoc signed for testing; public distribution still requires an Apple Developer certificate and notarization.
+The GitHub Actions workflow at `.github/workflows/build-macos.yml` runs the engine tests, downloads pinned arm64 Node/FFmpeg runtime files, builds the SwiftUI app, verifies the bundle and signature, and uploads a ZIP artifact. The public build is ad-hoc signed and is not Apple-notarized; the installer does not weaken or disable system-wide security settings.

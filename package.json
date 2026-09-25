@@ -1,9 +1,9 @@
 {
   "name": "traktor-stem-packager",
-  "version": "0.6.0-beta.22",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Self-contained macOS Traktor Stem packaging engine prototype",
+  "description": "Self-contained macOS utility for packaging existing stems for Traktor Pro 4",
   "scripts": {
     "pack": "node src/pack.mjs",
     "inspect": "node src/inspect.mjs",

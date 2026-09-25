@@ -11,12 +11,14 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
     runs-on: macos-15
     timeout-minutes: 30
+    outputs:
+      artifact_name: ${{ steps.package.outputs.artifact_name }}
 
     steps:
       - name: Check out source
@@ -73,19 +75,21 @@ jobs:
           zsh -n "$INSTALLER"
 
       - name: Package application with installer
+        id: package
         run: |
           DIST="Traktor Stem Packager Installer"
           PACKAGE_VERSION="$(node -p "require('./package.json').version")"
-          ARTIFACT_NAME="Traktor-Stem-Packager-$PACKAGE_VERSION-dual-mode-test"
+          ARTIFACT_NAME="Traktor-Stem-Packager-$PACKAGE_VERSION-macOS"
           mkdir -p "$DIST"
           ditto "macos/build/Traktor Stem Packager.app" "$DIST/Traktor Stem Packager.app"
           cp "macos/installer/Install Traktor Stem Packager.command" "$DIST/"
           cp "macos/installer/README.txt" "$DIST/"
-          cp "macos/installer/LOSSLESS-TEST-NOTES.txt" "$DIST/"
+          cp "macos/installer/LOSSLESS-WORKFLOW-NOTES.txt" "$DIST/"
           chmod +x "$DIST/Install Traktor Stem Packager.command"
           ditto -c -k --sequesterRsrc --keepParent "$DIST" "$ARTIFACT_NAME.zip"
           shasum -a 256 "$ARTIFACT_NAME.zip" > "$ARTIFACT_NAME.zip.sha256"
           echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> "$GITHUB_ENV"
+          echo "artifact_name=$ARTIFACT_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -146,3 +150,41 @@ jobs:
           file "$APP/Contents/Resources/Runtime/ffmpeg" | grep arm64
           test "$(plutil -extract CFBundleShortVersionString raw "$APP/Contents/Info.plist")" = "$PACKAGE_VERSION"
           zsh -n "macos/installer/Install Traktor Stem Packager.command"
+
+  publish-release:
+    name: Publish GitHub Release
+    if: github.ref == 'refs/heads/main'
+    needs:
+      - build
+      - compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+
+      - name: Download verified installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact_name }}
+          path: release-artifacts
+
+      - name: Verify installer checksum
+        working-directory: release-artifacts
+        run: sha256sum --check *.sha256
+
+      - name: Publish installer, checksum, and source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          RELEASE_TAG="v$PACKAGE_VERSION"
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists; leaving the published release unchanged."
+            exit 0
+          fi
+          gh release create "$RELEASE_TAG" \
+            release-artifacts/*.zip \
+            release-artifacts/*.sha256 \
+            --target "$GITHUB_SHA" \
+            --title "Traktor Stem Packager $PACKAGE_VERSION" \
+            --notes-file RELEASE_BODY.md

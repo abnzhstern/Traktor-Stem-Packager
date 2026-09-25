@@ -1,4 +1,19 @@
-# Version 0.6.0-beta.22
+# Version 1.0.0
+
+First stable public release of Traktor Stem Packager.
+
+- Packages an existing stereo master and four matching stems for Traktor Pro 4; it does not create or separate stems.
+- Offers two clear workflows: a standalone 320 kbps AAC `.stem.mp4`, or a lossless ALAC installation linked to the original analyzed Traktor master.
+- Preserves existing cues, beat grids, loops, play history, and other Traktor metadata in the lossless linked workflow.
+- Supports bit-identical lossless packaging for matched stereo PCM WAV/AIFF sources at 16-bit/44.1 kHz and 24-bit/48 kHz, with post-package PCM SHA-256 verification.
+- Imports standard metadata and artwork from the stereo master for the AAC workflow.
+- Validates file assignments, format compatibility, timing, and stem-sum headroom before packaging.
+- Guides the user through Traktor analysis, saving, installation, verification, and recovery with one highlighted next action.
+- Creates safety backups before changing Traktor's collection or replacing an existing linked Stem file.
+- Includes update notifications, a permanent latest-release download link, and an installer that safely replaces an older version.
+- Supports Apple Silicon Macs running macOS 14 or newer.
+
+## Release-candidate fixes incorporated in 1.0.0
 
 - Restored the proven beta 20 workflow and status presentation after beta 21’s global phase system hid important Traktor state and controls.
 - A successful lossless installation now remains Complete while its saved Traktor link and Stem file are still present, preventing the reinstall loop.
