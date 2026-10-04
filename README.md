@@ -16,6 +16,7 @@ The current build supports **Apple Silicon Macs** running **macOS 14 or newer**.
 
 - Accepts a stereo master plus four existing stems; the default Drums, Bass, Other, and Vocals display names can be edited
 - Optionally imports a folder containing exactly five audio files, proposes the Master and stem assignments from their filenames, and lets users drag files between rows before confirming
+- After a master is selected, can import a folder containing only the remaining stem files without replacing the master
 - Validates sample rate, channel count, duration, and synchronization-critical properties
 - Reads title, artist, album, release date, producer, label, genre, and artwork from the stereo master
 - Lets you edit metadata and stem display names before packaging
@@ -83,7 +84,15 @@ macos/scripts/build-app.sh
 
 The completed app is written to `macos/build/Traktor Stem Packager.app`.
 
-The AAC Stem File workflow is the shareable standalone `.stem.mp4` option. Lossless Linked Stems is the linked ALAC mode: Traktor must analyze the exact original master, and the app creates a timestamped collection backup before making the link. The app reveals the master for import into Traktor's Track Collection and verifies the saved ID. If Traktor is open at installation time, the app asks Traktor to close, waits for the saved collection, continues automatically, and relaunches Traktor. A manual fallback is shown if Traktor does not honor the normal quit request.
+The AAC Stem File workflow is the shareable standalone `.stem.mp4` option. Lossless Linked Stems is the linked ALAC mode: add and verify the master and four stems first, then let Traktor analyze the exact original master. The app creates a timestamped collection backup before making the link, reveals the master for import into Traktor's Track Collection, and verifies the saved ID. If Traktor is open at installation time, the app asks Traktor to close, waits for the saved collection, continues automatically, and relaunches Traktor. A manual fallback is shown if Traktor does not honor the normal quit request.
+
+After installation, the linked collection entry can load either version. Use **Load as Track**—or hold Shift while dragging the entry to a deck—to play the original stereo master. Use **Load as Stem** for the linked stems. Importing the master again is unnecessary and can create a confusing duplicate entry.
+
+## Safety and recovery
+
+Lossless Linked Stems modifies Traktor's `collection.nml` and configured Stems folder. Before changing either active item, the app creates a timestamped backup: the collection backup is written beside `collection.nml`, and a replaced linked Stem file receives a timestamped `.bak` copy beside the active Stem file. Keep Traktor closed while restoring either backup.
+
+The app's backups are an additional safeguard, not a substitute for your own current backup of the Traktor collection and music library. The software is provided as-is under the MIT License. Source audio files are never altered.
 
 The command-line packaging engine can also be run directly:
 

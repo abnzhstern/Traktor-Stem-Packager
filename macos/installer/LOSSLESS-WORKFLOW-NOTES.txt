@@ -17,7 +17,8 @@ HOW TO INSTALL LOSSLESS STEMS
 1. Select “Lossless Linked Stems.”
 2. Confirm the Collection and Stems folder paths shown by the app.
 3. Add the exact stereo master in the Master slot. Add the four matching stems
-   individually, select them together, or use Import Folder.
+   individually, select them together, import all five files from one folder,
+   or use Import Stems Folder after selecting the master.
 4. Review and accept the proposed assignments. Drag files between slots first
    if an assignment needs to be corrected.
 5. If the exact master is already analyzed in Traktor, the app links the stems
@@ -30,8 +31,10 @@ HOW TO INSTALL LOSSLESS STEMS
    state is saved. The app verifies the master, installs the lossless stems,
    and reopens Traktor. If Traktor does not close automatically, bring it
    forward and press Command-Q; leave Traktor Stem Packager open.
-8. In Traktor, load the ORIGINAL stereo master track. The linked-stems icon
-   should appear beside it and the track should load as a Stem Deck.
+8. The original master and linked stems share one Traktor collection entry.
+   Use Load as Track—or hold Shift while dragging—to play the original stereo
+   master. Use Load as Stem to play and control the four linked stems. Do not
+   import the master again.
 
 SAFETY AND AUDIO INTEGRITY
 
@@ -39,6 +42,10 @@ Before editing collection.nml, the app creates a timestamped backup. If a
 linked Stem file already exists, the app asks before replacing it and keeps the
 previous file as a timestamped .bak safety backup. The .bak file is not a
 second active Stem set.
+
+Keep your own current backup of the Traktor collection and music library. The
+app's timestamped backups are an additional safeguard, not a replacement for
+your normal backup. Keep Traktor closed if you restore either backup.
 
 Before installation, the app decodes all five packaged ALAC streams and
 requires their PCM SHA-256 hashes to match the five source files exactly.

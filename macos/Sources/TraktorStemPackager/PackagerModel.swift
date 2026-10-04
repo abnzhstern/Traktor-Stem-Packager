@@ -136,8 +136,7 @@ final class PackagerModel: ObservableObject {
 
     var canAddRemainingStems: Bool {
         files[.master] != nil && !hasAllFiles && !assignmentsNeedReview &&
-            state != .validating && state != .packaging && !traktorRefreshRequiresSave &&
-            (mode == .portableAAC || nativeReadiness?.ready == true)
+            state != .validating && state != .packaging
     }
 
     var canResolveUnsavedAnalysis: Bool {
@@ -272,6 +271,43 @@ final class PackagerModel: ObservableObject {
             state = .failed("The folder could not be read. Choose it again or add the files manually.")
             statusText = "The folder could not be read. Choose it again or add the files manually."
             recoveryText = "Check that the folder still exists and is readable, then choose it again or add the files individually."
+        }
+    }
+
+    func importRemainingStemsFolder(_ directory: URL) {
+        guard files[.master] != nil else {
+            importFolder(directory)
+            return
+        }
+        guard !assignmentsLocked else { return }
+
+        invalidatePendingWork()
+        let supported = Set(["wav", "wave", "aif", "aiff", "m4a", "aac", "mp3"])
+        let assignedPaths = Set(files.values.map { $0.standardizedFileURL })
+        let missingCount = AudioRole.allCases.filter { $0 != .master && files[$0] == nil }.count
+        do {
+            let candidates = try FileManager.default.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            )
+                .filter { supported.contains($0.pathExtension.lowercased()) }
+                .filter { !assignedPaths.contains($0.standardizedFileURL) }
+                .filter { suggestedRole(for: $0) != .master }
+                .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+
+            guard candidates.count == missingCount else {
+                state = .failed("This folder has \(candidates.count) unassigned stem file\(candidates.count == 1 ? "" : "s"), but \(missingCount) \(missingCount == 1 ? "is" : "are") still needed.")
+                statusText = "Choose a folder containing exactly the remaining stem files."
+                recoveryText = "The selected master and any stems already assigned are ignored. Choose a folder containing only the \(missingCount) missing stem file\(missingCount == 1 ? "" : "s"), or add them manually."
+                return
+            }
+
+            addStemFiles(candidates)
+        } catch {
+            state = .failed("The stem folder could not be read.")
+            statusText = "The stem folder could not be read."
+            recoveryText = "Check that the folder still exists and is readable, then choose it again or add the stems manually."
         }
     }
 

@@ -107,35 +107,67 @@ struct ContentView: View {
                             .buttonStyle(.bordered)
                     }
                 } else if model.canAddRemainingStems {
-                    Button("ADD REMAINING STEMS") { chooseRemainingStemFiles() }
-                        .font(.system(size: 9, weight: .semibold))
-                        .buttonStyle(.borderedProminent)
-                        .tint(.orange)
+                    VStack(alignment: .trailing, spacing: 5) {
+                        Button("ADD REMAINING STEMS") { chooseRemainingStemFiles() }
+                            .font(.system(size: 9, weight: .semibold))
+                            .buttonStyle(.borderedProminent)
+                            .tint(.orange)
+                        Text("OR")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.35))
+                        Button("IMPORT STEMS FOLDER") { chooseRemainingStemFolder() }
+                            .font(.system(size: 9, weight: .semibold))
+                            .buttonStyle(.bordered)
+                    }
                 }
             }
             if model.mode == .nativeLossless,
                model.files[.master] != nil,
+               model.hasAllFiles,
                !model.assignmentsNeedReview,
                model.state != .packaging {
                 VStack(alignment: .trailing, spacing: 6) {
-                    if !model.traktorRefreshRequiresSave && model.nativeReadiness?.ready == false {
+                    if model.nativeReadiness?.ready == false {
                         if model.traktorRunning {
-                            Button(model.canResolveUnsavedAnalysis ? "CLOSE TRAKTOR & INSTALL" : "CLOSE TRAKTOR & CHECK MASTER") {
-                                if model.canResolveUnsavedAnalysis {
-                                    Task { await model.create() }
-                                } else {
-                                    Task { await model.saveAndQuitAfterAnalysis() }
+                            if model.nativeReadiness?.found == false {
+                                Button("SHOW MASTER TO IMPORT") { model.revealMasterInFinder() }
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(.orange)
+                                Button("I FINISHED — CLOSE & VERIFY") {
+                                    if model.canResolveUnsavedAnalysis {
+                                        Task { await model.create() }
+                                    } else {
+                                        Task { await model.saveAndQuitAfterAnalysis() }
+                                    }
                                 }
+                                .font(.system(size: 9, weight: .semibold))
+                                .buttonStyle(.bordered)
+                            } else {
+                                Button(model.canResolveUnsavedAnalysis ? "CLOSE TRAKTOR & VERIFY / INSTALL" : "CLOSE TRAKTOR & VERIFY") {
+                                    if model.canResolveUnsavedAnalysis {
+                                        Task { await model.create() }
+                                    } else {
+                                        Task { await model.saveAndQuitAfterAnalysis() }
+                                    }
+                                }
+                                .font(.system(size: 9, weight: .semibold))
+                                .buttonStyle(.borderedProminent)
+                                .tint(.orange)
                             }
-                            .font(.system(size: 9, weight: .semibold))
-                            .buttonStyle(.borderedProminent)
-                            .tint(.orange)
                         } else {
                             Button("OPEN TRAKTOR & SHOW MASTER") { model.openTraktorAndRevealMaster() }
                                 .font(.system(size: 9, weight: .semibold))
                                 .buttonStyle(.borderedProminent)
-                                .tint(.orange)
+                            .tint(.orange)
                         }
+                    } else if model.traktorRunning {
+                        Button("CLOSE TRAKTOR & VERIFY / INSTALL") {
+                            Task { await model.create() }
+                        }
+                        .font(.system(size: 9, weight: .semibold))
+                        .buttonStyle(.borderedProminent)
+                        .tint(.orange)
                     }
                     Button("SHOW MASTER IN FINDER") { model.revealMasterInFinder() }
                     .font(.system(size: 9, weight: .semibold))
@@ -177,7 +209,10 @@ struct ContentView: View {
         }
 
         if model.files[.master] == nil {
-            return ("ADD AUDIO", "Add the exact stereo master used in Traktor first, or import a folder containing the master and four stems.", "waveform.badge.plus", .blue)
+            return ("ADD AUDIO", "Add the stereo master you want to use in Traktor and its four matching stems—individually, together, or with Import Folder. If the master is new to Traktor, the app will guide you through importing and analyzing it.", "waveform.badge.plus", .blue)
+        }
+        if !model.hasAllFiles {
+            return ("ADD REMAINING STEMS", "Add the four matching stems individually, select several at once, or import their folder. You can finish adding audio before preparing the master in Traktor.", "waveform.badge.plus", .blue)
         }
         if model.collectionURL == nil || model.stemsDirectoryURL == nil {
             return ("CHOOSE TRAKTOR LOCATIONS", "Confirm the Traktor Collection and Stems folder locations below.", "folder.badge.gearshape", .blue)
@@ -187,17 +222,18 @@ struct ContentView: View {
         }
         if model.nativeReadiness?.ready == false {
             if model.traktorRunning {
-                return ("NEXT ACTION", model.canResolveUnsavedAnalysis
-                    ? "Let Traktor finish analyzing the stereo master. Then choose Close Traktor & Install. The app will close Traktor, verify the saved analysis, install the stems, and reopen Traktor."
-                    : "Let Traktor finish analyzing the stereo master. Then choose Close Traktor & Check Master. The app will close Traktor, verify the saved analysis, and reopen it.", "arrow.right.circle.fill", .blue)
+                if model.nativeReadiness?.found == false {
+                    return ("IMPORT & ANALYZE MASTER", "Choose Show Master to Import, drag the highlighted file into Traktor’s Track Collection—not onto a deck—and analyze it. Then return here and choose Close Traktor & Verify / Install.", "arrow.right.circle.fill", .blue)
+                }
+                if model.nativeReadiness?.hasAudioId == false {
+                    return ("ANALYZE MASTER IN TRAKTOR", "The master is in Traktor but its saved entry has not been analyzed. Analyze it now, then return here and choose Close Traktor & Verify / Install.", "arrow.right.circle.fill", .blue)
+                }
+                return ("SAVE & VERIFY TRAKTOR", "The saved collection is not ready yet. When import and analysis are complete, choose Close Traktor & Verify / Install. The app will verify the saved master before changing anything.", "arrow.right.circle.fill", .blue)
             }
             return ("PREPARE MASTER IN TRAKTOR", "Traktor must analyze the exact stereo master before lossless stems can be installed. Choose Open Traktor & Show Master, then drag the highlighted file into Track Collection—not onto a deck.", "waveform.badge.magnifyingglass", .blue)
         }
         if model.traktorRunning && model.hasAllFiles {
             return ("READY TO VERIFY", "Traktor is open, so its current library state may not be saved yet. Choose Close Traktor & Verify / Install. The app will save and recheck the latest collection before changing anything.", "checkmark.circle.fill", .blue)
-        }
-        if !model.hasAllFiles {
-            return ("ADD AUDIO", "The analyzed master was found. Add the remaining four stems.", "waveform.badge.plus", .blue)
         }
         return ("READY TO INSTALL", "The analyzed master and all five files are ready. Choose Verify & Install Lossless Stems below.", "checkmark.circle.fill", .green)
     }
@@ -225,7 +261,7 @@ struct ContentView: View {
                         Text("THIS APP PACKAGES EXISTING STEMS")
                             .font(.system(size: 10, weight: .bold))
                             .tracking(0.7)
-                        Text("It does not create or separate stems. Start with one stereo master and four matching stem files. Add them individually or use Import Folder.")
+                        Text("It does not create or separate stems. Start with one stereo master and four matching stem files. Add them individually, select several together, or use Import Folder.")
                             .font(.system(size: 11))
                             .foregroundStyle(Color.white.opacity(0.65))
                             .fixedSize(horizontal: false, vertical: true)
@@ -263,12 +299,12 @@ struct ContentView: View {
                         bestFor: "Choose this to preserve the original PCM audio. The app links four lossless stems to the exact stereo master in Traktor. If that master isn’t already in your collection, the app guides you through adding and analyzing it first.",
                         result: "Preserves source PCM in Traktor’s linked Stem format.",
                         steps: [
-                            "Add the stereo master and four matching stems to this app.",
+                            "Add the stereo master and four matching stems to this app individually, together, or from a folder.",
                             "Already in Traktor? Select the exact same master file that Traktor analyzed. The app links the four stems to that existing track and preserves its cues, beat grid, loops and other Traktor data.",
                             "Not in Traktor? The app walks you through importing and analyzing the master, then links the four stems to it as a new track.",
                             "Follow the single orange action. The app verifies Traktor’s saved collection, installs the stems and reopens Traktor."
                         ],
-                        note: "In both cases, load the stereo master in Traktor to use the four linked lossless stems. A duplicate master stored in another folder may be treated as a different track."
+                        note: "After installation, use Load as Track—or hold Shift while dragging—to hear the original stereo master. Use Load as Stem for the linked stems. Both versions use the same Traktor entry; do not import a duplicate master."
                     )
 
                     HStack(spacing: 9) {
@@ -280,6 +316,20 @@ struct ContentView: View {
                             .foregroundStyle(Color.white.opacity(0.7))
                     }
                     .padding(.horizontal, 2)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("LOSSLESS SAFETY")
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(0.6)
+                        Text("Lossless installation changes Traktor’s collection.nml and Stems folder. The app creates timestamped backups first, but keep your own current backup of your Traktor collection and music library. Source audio files are never altered.")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.white.opacity(0.62))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(11)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.orange.opacity(0.045))
+                    .overlay(Rectangle().stroke(Color.orange.opacity(0.2)))
 
                     VStack(alignment: .leading, spacing: 7) {
                         Text("ONE-TIME MAC SECURITY SETUP")
@@ -560,7 +610,7 @@ struct ContentView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("v1.0.2")
+                Text("v1.0.3")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.62))
                 Text("AAC + VERIFIED LOSSLESS")
@@ -694,8 +744,14 @@ struct ContentView: View {
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(Color.white.opacity(0.32))
                 }
-                if !model.assignmentsNeedReview {
-                    Button("IMPORT FOLDER") { chooseAudioFolder() }
+                if !model.assignmentsNeedReview && !model.hasAllFiles {
+                    Button(model.files[.master] == nil ? "IMPORT FOLDER" : "IMPORT STEMS FOLDER") {
+                        if model.files[.master] == nil {
+                            chooseAudioFolder()
+                        } else {
+                            chooseRemainingStemFolder()
+                        }
+                    }
                         .font(.system(size: 9, weight: .semibold))
                         .buttonStyle(.bordered)
                 }
@@ -800,8 +856,8 @@ struct ContentView: View {
                         .buttonStyle(.borderedProminent)
                         .tint(.green)
                 }
-            } else if !model.traktorRefreshRequiresSave &&
-                        (model.mode == .portableAAC || model.nativeReadiness?.ready == true) {
+            } else if model.mode == .portableAAC ||
+                        (model.nativeReadiness?.ready == true && !model.traktorRunning) {
                 Button(model.primaryActionTitle) {
                     Task { await model.create() }
                 }
@@ -871,6 +927,21 @@ struct ContentView: View {
         presentOpenPanel(panel) { accepted in
             if let first = accepted.urls.first { model.recordAudioSelection(first) }
             model.addStemFiles(Array(accepted.urls.prefix(missingCount)))
+        }
+    }
+
+    private func chooseRemainingStemFolder() {
+        let panel = NSOpenPanel()
+        panel.directoryURL = model.preferredAudioDirectoryURL
+        panel.allowsMultipleSelection = false
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = false
+        panel.message = "Choose a folder containing the remaining stem files"
+        presentOpenPanel(panel) { accepted in
+            guard let directory = accepted.url else { return }
+            model.recordAudioSelection(directory)
+            model.importRemainingStemsFolder(directory)
         }
     }
 

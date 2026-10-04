@@ -76,11 +76,19 @@ Traktor saves additions and deletions to collection.nml when it closes. If Trakt
 
 While the app is open, it monitors the saved collection and Stems folder and updates when Traktor writes changes. The Traktor Status line says SAVED STATE while Traktor is open because very recent changes may still exist only inside Traktor. Choose Refresh Traktor Status at any time; closing Traktor remains the definitive way to force its latest collection state to disk.
 
-Start by adding the exact stereo master to the app. You may add the four stems at the same time, individually or with Import Folder, or add them later. If the master is not already analyzed, choose Open Traktor & Show Master. The app opens Traktor and brings Finder to the foreground with the exact master highlighted. Drag it into Traktor's Track Collection, not onto a deck, and let analysis finish. Show Master in Finder remains available whenever a master is loaded.
+Start by adding the exact stereo master and four matching stems to the app. Add them individually, select several files together, import all five files from one folder, or choose Import Stems Folder after selecting the master. Review and verify all five assignments before the Traktor handoff begins. If the master is not already analyzed, choose Open Traktor & Show Master. The app opens Traktor and brings Finder to the foreground with the exact master highlighted. Drag it into Traktor's Track Collection, not onto a deck, and analyze it. Then return to the Packager and follow the orange Close Traktor & Verify / Install action. Show Master in Finder remains available whenever a master is loaded.
 
 If linked stems already exist for that master, the app asks before replacing them. A timestamped .bak file is a safety backup of the previous linked Stem file, not a second active Stem set.
 
 Traktor must close before the app edits collection.nml. Follow the orange next-action button. The app asks Traktor to close, verifies the latest saved collection, installs the stems only if the master is present and analyzed, and reopens Traktor. Traktor may briefly say Updating Settings while saving its collection; that is expected.
+
+After installation, use the same linked Traktor collection entry for both versions. Choose Load as Track—or hold Shift while dragging the entry to a deck—to hear the original stereo master. Choose Load as Stem for the four linked stems. Do not import the master again; doing so can create a confusing duplicate entry.
+
+SAFETY AND RECOVERY
+
+Lossless Linked Stems modifies Traktor's collection.nml and configured Stems folder. Before making active changes, the app creates a timestamped collection backup beside collection.nml. If an existing linked Stem file is replaced, its timestamped .bak backup is stored beside the active Stem file. Keep Traktor closed when restoring either backup.
+
+Maintain your own current backup of the Traktor collection and music library. The app's backups are an additional safeguard, not a substitute for your normal backup. The software is provided as-is under the MIT License. Source audio files are never altered.
 
 MAC PRIVACY & SECURITY
 
@@ -94,6 +102,6 @@ Open Traktor / Bring Traktor Forward remains available in the app header as a ne
 
 PREFERENCES
 
-Choose Traktor Stem Packager > Settings to control which workflow appears at launch, whether Traktor opens automatically after an AAC export, and whether the User Guide appears at launch. "Remember Last Used" is the default startup choice.
+Choose Traktor Stem Packager > Settings to control which workflow appears at launch, whether Traktor opens after creating an AAC Stem file, and whether the User Guide appears at launch. "Remember Last Used" is the default startup choice.
 
 The selected Traktor Collection and Stems folder are remembered between launches. You can change either location for another Traktor installation or an external drive. If a saved drive is disconnected, the app marks it unavailable and keeps the selection instead of silently switching to another folder. Use Reset to Detected Defaults to return to the automatically detected locations.

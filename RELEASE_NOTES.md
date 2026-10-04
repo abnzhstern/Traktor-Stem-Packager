@@ -1,3 +1,14 @@
+# Version 1.0.3
+
+- Collects and validates the master and all four stems before beginning the Lossless Linked Stems handoff.
+- Adds a dedicated Import Stems Folder action after a master is selected, while retaining manual and multi-file stem selection.
+- Replaces the passive “Let Traktor finish analyzing” wording with explicit import, analysis, return, verification, and installation actions.
+- Keeps the master-import action visible instead of leaving Show Master in Finder as the only apparent control.
+- Explains how the same linked Traktor entry can play the original master with Load as Track or the stems with Load as Stem.
+- Adds plain-language backup, recovery, and as-is safety guidance to the README, installer documentation, and in-app User Guide.
+- Clarifies the AAC launch preference as “Open Traktor after creating an AAC Stem file.”
+- Leaves audio encoding, lossless PCM verification, and Traktor collection-mutation logic unchanged.
+
 # Version 1.0.2
 
 - Renamed the in-app help page, header button, and launch preference consistently to “User Guide.”

@@ -1,12 +1,15 @@
-# Traktor Stem Packager 1.0.2
+# Traktor Stem Packager 1.0.3
 
-This terminology update makes the two workflows and the in-app help easier to understand:
+This update makes the Lossless Linked Stems handoff explicit from beginning to end:
 
-- **User Guide** is now the consistent name for the guide page, its header button, and its launch setting.
-- **Lossless Linked Stems** replaces “Lossless Traktor Installation.”
-- The lossless description now explains that the app preserves the original PCM audio by linking four lossless stems to the exact stereo master in Traktor. If the master is not already in the collection, the app guides the user through adding and analyzing it first.
+- Add and verify the stereo master and four stems before beginning the Traktor handoff.
+- Add remaining stems manually, select several at once, or import a folder containing only the missing stems.
+- Explicit prompts distinguish importing the master, analyzing it, closing Traktor, verifying the saved collection, and installing the linked stems.
+- The guide now explains how to play the original master with **Load as Track** and the linked stems with **Load as Stem**, without importing a duplicate master.
+- The README, installer guide, and in-app User Guide now include clear backup and recovery guidance.
+- The AAC preference now reads “Open Traktor after creating an AAC Stem file.”
 
-No audio engine, packaging, metadata, Traktor-linking, or workflow behavior changed.
+No audio encoding, lossless PCM verification, or Traktor collection-mutation logic changed.
 
 ## Requirements
 
@@ -16,7 +19,7 @@ No audio engine, packaging, metadata, Traktor-linking, or workflow behavior chan
 
 ## Installation
 
-Download `Traktor-Stem-Packager-1.0.2-macOS.zip`, unzip it, and follow the included README. Installing the update replaces the existing app and moves the previous copy to the Trash as a recoverable backup.
+Download `Traktor-Stem-Packager-1.0.3-macOS.zip`, unzip it, and follow the included README. Installing the update replaces the existing app and moves the previous copy to the Trash as a recoverable backup.
 
 This free build is ad-hoc signed rather than Apple-notarized. Some Macs require the documented one-time Terminal installation method. The installer does not disable Gatekeeper or change system-wide security settings.
 

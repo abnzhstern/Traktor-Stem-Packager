@@ -16,7 +16,7 @@ struct PreferencesView: View {
                 }
             }
 
-            Toggle("Open Traktor automatically after AAC export", isOn: $openTraktorAfterAAC)
+            Toggle("Open Traktor after creating an AAC Stem file", isOn: $openTraktorAfterAAC)
             Toggle("Show User Guide when the app opens", isOn: showGuideBinding)
 
             Section("Audio Files") {
